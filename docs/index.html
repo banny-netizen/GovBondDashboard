@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>외화 국채 정보 대시보드</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb;
+  --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7;
+  --border: rgba(11,11,11,.10); --wash: rgba(11,11,11,.05);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;      /* 만기별 계열 */
+  --o1: #104281; --o2: #2a78d6; --o3: #86b6ef;      /* 시점별 계열: 최근일수록 진하게 */
+}
+@media (prefers-color-scheme: dark) {
+  .viz-root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835;
+    --border: rgba(255,255,255,.10); --wash: rgba(255,255,255,.06);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --o1: #9ec5f4; --o2: #3987e5; --o3: #184f95;    /* 어두운 바탕에서는 최근일수록 밝게 */
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+}
+main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 0; }
+.sub { color: var(--ink2); margin: 0; }
+.note { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; margin-top: 16px;
+}
+.card-head { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.tile .label { color: var(--ink2); font-size: 13px; }
+.tile .value { font-size: 26px; font-weight: 600; line-height: 1.25; }
+.tile .delta { color: var(--ink2); font-size: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink2); font-size: 12px; }
+.lg { display: inline-flex; align-items: center; gap: 6px; }
+.key { display: inline-block; width: 14px; height: 2px; border-radius: 1px; flex: none; }
+.chart { position: relative; }
+.chart svg { display: block; max-width: 100%; height: auto; outline-offset: 2px; }
+.grid { stroke: var(--grid); stroke-width: 1; }
+.axis { stroke: var(--axis); stroke-width: 1; }
+.cross { stroke: var(--axis); stroke-width: 1; }
+.tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.endlabel { fill: var(--ink); font-size: 11px; font-weight: 600; }
+.line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.dot { stroke: var(--surface); stroke-width: 2; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 2; min-width: 120px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+.tip-h { color: var(--ink2); margin-bottom: 4px; }
+.tip-r { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tip-r strong { font-variant-numeric: tabular-nums; }
+.tip-n { color: var(--ink2); }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 24px; }
+.filters .flabel { color: var(--ink2); font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font: inherit; font-size: 13px; color: var(--ink2); background: transparent;
+  border: 0; padding: 5px 12px; cursor: pointer;
+}
+.seg button:hover { background: var(--wash); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th { color: var(--ink2); font-weight: 600; border-bottom-color: var(--axis); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:last-child td { border-bottom: 0; }
+footer { color: var(--ink2); font-size: 12px; margin-top: 24px; }
+footer p { margin: 4px 0; }
+footer a { color: inherit; }
+details { margin-top: 6px; }
+</style>
+</head>
+<body class="viz-root">
+<main>
+  <header>
+    <h1>외화 국채 정보 대시보드</h1>
+    <p class="sub" id="asof">미국 국채</p>
+  </header>
+
+  <p class="card" id="empty" hidden>아직 수집된 자료가 없습니다. 첫 수집이 끝나면 표시됩니다.</p>
+
+  <div id="content" hidden>
+    <section class="tiles" id="tiles" aria-label="주요 만기 금리"></section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>수익률 곡선</h2>
+          <p class="note">미 재무부 Par Yield Curve. 최근 영업일과 1주 전, 1개월 전 비교.</p>
+        </div>
+        <div class="legend" id="curve-legend"></div>
+      </div>
+      <div class="chart" id="curve-chart"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>만기별 금리</h2></div>
+      <div class="tablewrap" id="curve-table"></div>
+    </section>
+
+    <div class="filters">
+      <span class="flabel">기간</span>
+      <div class="seg" id="range" role="group" aria-label="금리 추이 기간"></div>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>금리 추이</h2>
+          <p class="note">2년·10년·30년 일별 금리.</p>
+        </div>
+        <div class="legend" id="trend-legend"></div>
+      </div>
+      <div class="chart" id="trend-chart"></div>
+    </section>
+
+    <div class="filters">
+      <span class="flabel">입찰 종류</span>
+      <div class="seg" id="kind" role="group" aria-label="입찰 종류"></div>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>입찰 결과</h2>
+        <p class="note" id="auction-note"></p>
+      </div>
+      <div class="tablewrap" id="result-table"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>입찰 예정·결과 대기</h2>
+        <p class="note">공고됐지만 결과가 아직 올라오지 않은 입찰.</p>
+      </div>
+      <div class="tablewrap" id="pending-table"></div>
+    </section>
+  </div>
+
+  <footer>
+    <p>출처: <a href="https://home.treasury.gov/policy-issues/financing-the-government/interest-rate-statistics">미 재무부 금리 통계</a>, TreasuryDirect, 미 재무부 Fiscal Data. 모두 공개 자료이며 매일 08:47(KST)에 자동 수집합니다.</p>
+    <p>이 화면은 공개 API에서 받은 자료만 보여 줍니다. 참고용이며 투자 권유가 아닙니다.</p>
+    <details id="warn" hidden><summary></summary><ul id="warn-list"></ul></details>
+  </footer>
+</main>
+
+<script>
+(async function () {
+  'use strict';
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const $ = (id) => document.getElementById(id);
+  const h = (tag, props, ...kids) => {
+    const e = document.createElement(tag);
+    for (const k in (props || {})) {
+      if (k === 'class') e.className = props[k];
+      else if (k === 'text') e.textContent = props[k];
+      else e.setAttribute(k, props[k]);
+    }
+    for (const kid of kids) if (kid != null) e.append(kid);
+    return e;
+  };
+  const s = (tag, attrs) => {
+    const e = document.createElementNS(SVG_NS, tag);
+    for (const k in (attrs || {})) e.setAttribute(k, attrs[k]);
+    return e;
+  };
+
+  let data;
+  try {
+    const res = await fetch('data/us.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error(String(res.status));
+    data = await res.json();
+    if (!data.curve || !data.curve.rows || !data.curve.rows.length) throw new Error('empty');
+  } catch (err) {
+    $('empty').hidden = false;
+    return;
+  }
+  $('content').hidden = false;
+
+  // ---------- 공통 계산 ----------
+  const tenors = data.curve.tenors;
+  const rows = data.curve.rows;                 // [날짜, 만기별 금리...] 날짜 오름차순
+  const last = rows[rows.length - 1];
+  const prev = rows.length > 1 ? rows[rows.length - 2] : null;
+  const col = (t) => tenors.indexOf(t) + 1;
+  const shiftDay = (iso, days) => {
+    const d = new Date(iso + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() - days);
+    return d.toISOString().slice(0, 10);
+  };
+  const rowOnOrBefore = (iso) => {
+    for (let i = rows.length - 1; i >= 0; i--) if (rows[i][0] <= iso) return rows[i];
+    return null;
+  };
+  const week = rowOnOrBefore(shiftDay(last[0], 7));
+  const month = rowOnOrBefore(shiftDay(last[0], 30));
+  const bp = (a, b) => (a == null || b == null) ? null : Math.round((a - b) * 100);
+  const fmtBp = (v) => v == null ? '–' : v === 0 ? '0' : (v > 0 ? '+' : '−') + Math.abs(v);
+  const fmtPct = (v, digits) => v == null ? '–' : v.toFixed(digits == null ? 2 : digits);
+  const tenorKo = (t) => t.replace('M', '개월').replace('Y', '년');
+  const kst = (iso) => {
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    const k = new Date(d.getTime() + 9 * 3600 * 1000).toISOString();
+    return k.slice(0, 10) + ' ' + k.slice(11, 16) + ' KST';
+  };
+
+  $('asof').textContent = '미국 국채 · 기준일 ' + last[0] + ' (미국 현지) · 수집 ' + kst(data.generated_at);
+
+  // ---------- 주요 만기 ----------
+  (function tiles() {
+    const host = $('tiles');
+    const moved = (d, unit) => d == null ? '전일 자료 없음'
+      : d === 0 ? '전일과 같음'
+      : (d > 0 ? '▲ ' : '▼ ') + Math.abs(d) + unit + ' 전일 대비';
+    for (const [label, t] of [['2년', '2Y'], ['5년', '5Y'], ['10년', '10Y'], ['30년', '30Y']]) {
+      const v = last[col(t)];
+      host.append(h('div', { class: 'tile' },
+        h('div', { class: 'label', text: label }),
+        h('div', { class: 'value', text: v == null ? '–' : v.toFixed(2) + '%' }),
+        h('div', { class: 'delta', text: moved(bp(v, prev && prev[col(t)]), 'bp') })));
+    }
+    const spread = bp(last[col('10Y')], last[col('2Y')]);
+    const spreadPrev = prev ? bp(prev[col('10Y')], prev[col('2Y')]) : null;
+    host.append(h('div', { class: 'tile' },
+      h('div', { class: 'label', text: '10년 − 2년' }),
+      h('div', { class: 'value', text: spread == null ? '–' : fmtBp(spread) + 'bp' }),
+      h('div', { class: 'delta', text: moved(spread == null || spreadPrev == null ? null : spread - spreadPrev, 'bp') })));
+  })();
+
+  // ---------- 꺾은선 차트 ----------
+  function legend(host, items) {
+    host.textContent = '';
+    for (const it of items) {
+      const key = h('span', { class: 'key' });
+      key.style.background = 'var(' + it.color + ')';
+      host.append(h('span', { class: 'lg' }, key, h('span', { text: it.name })));
+    }
+  }
+
+  function lineChart(host, cfg) {
+    host.textContent = '';
+    const n = cfg.labels.length;
+    const all = cfg.series.flatMap((sr) => sr.values).filter((v) => v != null);
+    if (!all.length || n < 2) {
+      host.append(h('p', { class: 'note', text: '표시할 자료가 없습니다.' }));
+      return;
+    }
+    const W = Math.max(300, Math.floor(host.clientWidth));
+    const H = 280;
+    const m = { t: 10, r: cfg.endLabels ? 52 : 16, b: 26, l: 38 };
+
+    let lo = Math.min(...all), hi = Math.max(...all);
+    const span = Math.max(hi - lo, 0.05);
+    const step = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2].find((st) => span * 1.08 / st <= 6) || 5;
+    lo = Math.floor((lo - span * 0.04) / step) * step;
+    hi = Math.ceil((hi + span * 0.04) / step) * step;
+    const steps = Math.round((hi - lo) / step);
+    const digits = Number.isInteger(step) ? 0 : Number.isInteger(Math.round(step * 1000) / 100) ? 1 : 2;
+    const x = (i) => m.l + (W - m.l - m.r) * (i / (n - 1));
+    const y = (v) => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+
+    const svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, role: 'img', tabindex: '0', 'aria-label': cfg.aria });
+
+    for (let i = 0; i <= steps; i++) {
+      const v = lo + i * step;
+      svg.append(s('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: i === 0 ? 'axis' : 'grid' }));
+      const t = s('text', { x: m.l - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'tick' });
+      t.textContent = v.toFixed(digits);
+      svg.append(t);
+    }
+    for (const i of cfg.ticks(W)) {
+      const t = s('text', { x: x(i), y: H - 8, 'text-anchor': 'middle', class: 'tick' });
+      t.textContent = cfg.tickLabel ? cfg.tickLabel(i) : cfg.labels[i];
+      svg.append(t);
+    }
+
+    // 뒤 계열부터 그려 첫 계열이 맨 위에 오게 한다
+    for (const sr of cfg.series.slice().reverse()) {
+      let d = '', pen = false;
+      sr.values.forEach((v, i) => {
+        if (v == null) { pen = false; return; }
+        d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1);
+        pen = true;
+      });
+      const path = s('path', { d: d, class: 'line' });
+      path.style.stroke = 'var(' + sr.color + ')';
+      svg.append(path);
+    }
+
+    if (cfg.endLabels) {
+      const ends = [];
+      for (const sr of cfg.series) {
+        let i = n - 1;
+        while (i >= 0 && sr.values[i] == null) i--;
+        if (i >= 0) ends.push({ sr: sr, i: i, v: sr.values[i] });
+      }
+      const ys = ends.map((e) => y(e.v)).sort((a, b) => a - b);
+      const crowded = ys.some((v, k) => k > 0 && v - ys[k - 1] < 13);
+      for (const e of ends) {
+        const dot = s('circle', { cx: x(e.i), cy: y(e.v), r: 4, class: 'dot' });
+        dot.style.fill = 'var(' + e.sr.color + ')';
+        svg.append(dot);
+        if (!crowded) {
+          const t = s('text', { x: x(e.i) + 9, y: y(e.v) + 4, class: 'endlabel' });
+          t.textContent = e.v.toFixed(2);
+          svg.append(t);
+        }
+      }
+    }
+
+    const cross = s('line', { y1: m.t, y2: H - m.b, class: 'cross' });
+    cross.style.display = 'none';
+    svg.append(cross);
+    const dots = cfg.series.map((sr) => {
+      const c = s('circle', { r: 4, class: 'dot' });
+      c.style.fill = 'var(' + sr.color + ')';
+      c.style.display = 'none';
+      svg.append(c);
+      return c;
+    });
+    const tip = h('div', { class: 'tip' });
+    tip.hidden = true;
+    host.append(svg, tip);
+
+    let cur = null;
+    const show = (i) => {
+      cur = i;
+      cross.setAttribute('x1', x(i));
+      cross.setAttribute('x2', x(i));
+      cross.style.display = '';
+      cfg.series.forEach((sr, k) => {
+        const v = sr.values[i];
+        if (v == null) { dots[k].style.display = 'none'; return; }
+        dots[k].setAttribute('cx', x(i));
+        dots[k].setAttribute('cy', y(v));
+        dots[k].style.display = '';
+      });
+      tip.textContent = '';
+      tip.append(h('div', { class: 'tip-h', text: cfg.tipLabel ? cfg.tipLabel(i) : cfg.labels[i] }));
+      for (const sr of cfg.series) {
+        const key = h('span', { class: 'key' });
+        key.style.background = 'var(' + sr.color + ')';
+        const v = sr.values[i];
+        tip.append(h('div', { class: 'tip-r' }, key,
+          h('strong', { text: v == null ? '–' : v.toFixed(2) + '%' }),
+          h('span', { class: 'tip-n', text: sr.name })));
+      }
+      tip.hidden = false;
+      const scale = svg.getBoundingClientRect().width / W;
+      const tw = tip.offsetWidth;
+      let left = x(i) * scale + 12;
+      if (left + tw > host.clientWidth - 4) left = x(i) * scale - 12 - tw;
+      tip.style.left = Math.max(4, left) + 'px';
+      tip.style.top = (m.t + 4) + 'px';
+    };
+    const hide = () => {
+      cross.style.display = 'none';
+      dots.forEach((c) => { c.style.display = 'none'; });
+      tip.hidden = true;
+    };
+    const clamp = (i) => Math.max(0, Math.min(n - 1, i));
+    svg.addEventListener('pointermove', (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) * (W / r.width);
+      show(clamp(Math.round((px - m.l) / (W - m.l - m.r) * (n - 1))));
+    });
+    svg.addEventListener('pointerleave', hide);
+    svg.addEventListener('focus', () => show(cur == null ? n - 1 : cur));
+    svg.addEventListener('blur', hide);
+    svg.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      ev.preventDefault();
+      show(clamp((cur == null ? n - 1 : cur) + (ev.key === 'ArrowRight' ? 1 : -1)));
+    });
+  }
+
+  // ---------- 수익률 곡선 ----------
+  const curveSeries = [{ name: '최근 (' + last[0] + ')', color: '--o1', values: last.slice(1) }];
+  if (week && week !== last) curveSeries.push({ name: '1주 전 (' + week[0] + ')', color: '--o2', values: week.slice(1) });
+  if (month && month !== last && month !== week) curveSeries.push({ name: '1개월 전 (' + month[0] + ')', color: '--o3', values: month.slice(1) });
+  const mainTenors = ['1M', '3M', '1Y', '2Y', '5Y', '10Y', '30Y'];
+  function drawCurve() {
+    legend($('curve-legend'), curveSeries);
+    lineChart($('curve-chart'), {
+      labels: tenors,
+      series: curveSeries,
+      aria: '미국 국채 수익률 곡선. 좌우 화살표로 만기별 값을 읽을 수 있습니다.',
+      ticks: (W) => tenors.map((t, i) => i).filter((i) => W >= 560 || mainTenors.includes(tenors[i])),
+      tipLabel: (i) => tenorKo(tenors[i]),
+    });
+  }
+
+  (function curveTable() {
+    const cols = [
+      { name: '만기' },
+      { name: '최근 (%)', num: true },
+      { name: '전일 대비 (bp)', num: true },
+      { name: '1주 전 대비 (bp)', num: true },
+      { name: '1개월 전 대비 (bp)', num: true },
+    ];
+    const body = tenors.map((t, i) => {
+      const v = last[i + 1];
+      return [tenorKo(t), fmtPct(v),
+        fmtBp(bp(v, prev && prev[i + 1])),
+        fmtBp(bp(v, week && week !== last ? week[i + 1] : null)),
+        fmtBp(bp(v, month && month !== last ? month[i + 1] : null))];
+    });
+    table($('curve-table'), cols, body, '');
+  })();
+
+  // ---------- 금리 추이 ----------
+  const trendDefs = [['2년', '2Y', '--s1'], ['10년', '10Y', '--s2'], ['30년', '30Y', '--s3']];
+  const ranges = [['1개월', 22], ['3개월', 66], ['6개월', 130], ['1년', 9999]];
+  let rangeIdx = 1;
+  function drawTrend() {
+    const part = rows.slice(-ranges[rangeIdx][1]);
+    const series = trendDefs.map(([name, t, color]) => ({ name: name, color: color, values: part.map((r) => r[col(t)]) }));
+    legend($('trend-legend'), series);
+    const long = part.length > 70;
+    lineChart($('trend-chart'), {
+      labels: part.map((r) => r[0]),
+      series: series,
+      endLabels: true,
+      aria: '미국 국채 2년, 10년, 30년 금리 추이. 좌우 화살표로 날짜별 값을 읽을 수 있습니다.',
+      ticks: (W) => {
+        const want = W >= 560 ? 6 : 4;
+        const out = [];
+        for (let k = 0; k < want; k++) out.push(Math.round(k * (part.length - 1) / (want - 1)));
+        return [...new Set(out)];
+      },
+      tickLabel: (i) => long ? part[i][0].slice(2, 7).replace('-', '.') : part[i][0].slice(5).replace('-', '/'),
+    });
+  }
+
+  function segmented(host, labels, selected, onPick) {
+    host.textContent = '';
+    labels.forEach((label, i) => {
+      const b = h('button', { type: 'button', text: label, 'aria-pressed': String(i === selected) });
+      b.addEventListener('click', () => {
+        [...host.children].forEach((c, k) => c.setAttribute('aria-pressed', String(k === i)));
+        onPick(i);
+      });
+      host.append(b);
+    });
+  }
+  segmented($('range'), ranges.map((r) => r[0]), rangeIdx, (i) => { rangeIdx = i; drawTrend(); });
+
+  // ---------- 표 ----------
+  function table(host, cols, body, emptyText) {
+    host.textContent = '';
+    if (!body.length) {
+      host.append(h('p', { class: 'note', text: emptyText }));
+      return;
+    }
+    const thead = h('tr');
+    for (const c of cols) thead.append(h('th', { text: c.name, class: c.num ? 'num' : '', scope: 'col' }));
+    const tbody = h('tbody');
+    for (const r of body) {
+      const tr = h('tr');
+      r.forEach((cell, i) => tr.append(h('td', { text: cell, class: cols[i].num ? 'num' : '' })));
+      tbody.append(tr);
+    }
+    host.append(h('table', null, h('thead', null, thead), tbody));
+  }
+
+  // ---------- 입찰 ----------
+  const auctions = data.auctions || { results: [], pending: [] };
+  const kinds = [
+    ['이표채', (r) => ['Note', 'Bond', 'TIPS', 'FRN'].includes(r.type)],
+    ['단기채', (r) => ['Bill', 'CMB'].includes(r.type)],
+    ['전체', () => true],
+  ];
+  let kindIdx = 0;
+  const termKo = (t) => String(t).replace(/-Year/g, '년').replace(/-Month/g, '개월').replace(/-Week/g, '주').replace(/-Day/g, '일');
+  const amount = (v) => v == null ? '–' : Math.round(v / 1e8).toLocaleString('ko-KR');
+  const rateText = (r) => r.high_rate == null ? '–'
+    : r.high_rate.toFixed(3) + (r.rate_kind === 'discount' ? ' 할인율' : r.rate_kind === 'margin' ? ' 가산금리' : '');
+  function drawAuctions() {
+    const pick = kinds[kindIdx][1];
+    table($('result-table'), [
+      { name: '입찰일' }, { name: '종류' }, { name: '만기' },
+      { name: '발행액 (억 달러)', num: true }, { name: '낙찰금리 (%)', num: true },
+      { name: '응찰률 (배)', num: true }, { name: '표면금리 (%)', num: true }, { name: '구분' },
+    ], (auctions.results || []).filter(pick).slice(0, 25).map((r) => [
+      r.auction_date, r.type, termKo(r.term), amount(r.offering_amt), rateText(r),
+      fmtPct(r.bid_to_cover), fmtPct(r.coupon, 3), r.reopening ? '리오픈' : '신규',
+    ]), '해당하는 입찰 결과가 없습니다.');
+    table($('pending-table'), [
+      { name: '입찰일' }, { name: '발행일' }, { name: '종류' }, { name: '만기' },
+      { name: '발행액 (억 달러)', num: true }, { name: '구분' },
+    ], (auctions.pending || []).filter(pick).map((r) => [
+      r.auction_date, r.issue_date || '–', r.type, termKo(r.term), amount(r.offering_amt),
+      r.reopening ? '리오픈' : '신규',
+    ]), '해당하는 입찰이 없습니다.');
+  }
+  $('auction-note').textContent = auctions.source
+    ? '출처 ' + auctions.source + ' · 결과 반영 ' + (auctions.latest_result || '없음') + '까지'
+    : '입찰 자료를 받지 못했습니다.';
+  segmented($('kind'), kinds.map((k) => k[0]), kindIdx, (i) => { kindIdx = i; drawAuctions(); });
+
+  // ---------- 수집 경고 ----------
+  if (data.errors && data.errors.length) {
+    $('warn').hidden = false;
+    $('warn').querySelector('summary').textContent = '수집 경고 ' + data.errors.length + '건';
+    for (const line of data.errors) $('warn-list').append(h('li', { text: line }));
+  }
+
+  drawCurve();
+  drawTrend();
+  drawAuctions();
+  // 차트 영역 너비가 바뀌면 그 너비에 맞춰 다시 그린다
+  let drawnWidth = $('curve-chart').clientWidth;
+  new ResizeObserver(() => {
+    const w = $('curve-chart').clientWidth;
+    if (w === drawnWidth) return;
+    drawnWidth = w;
+    drawCurve();
+    drawTrend();
+  }).observe($('curve-chart'));
+})();
+</script>
+</body>
+</html>

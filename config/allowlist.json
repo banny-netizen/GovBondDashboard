@@ -1,0 +1,13 @@
+{
+  "hosts": {
+    "home.treasury.gov": "미 재무부 — 일별 국채 수익률 곡선 (XML 피드)",
+    "www.treasurydirect.gov": "TreasuryDirect — 국채 입찰 결과·예정",
+    "api.fiscaldata.treasury.gov": "미 재무부 Fiscal Data — 국채 입찰 결과 (보조 출처)"
+  },
+  "outputs": [
+    "us.json"
+  ],
+  "identifiers": [
+    "http://www.w3.org/2000/svg"
+  ]
+}

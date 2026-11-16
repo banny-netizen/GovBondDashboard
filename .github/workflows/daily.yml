@@ -1,0 +1,44 @@
+name: daily-collect
+
+on:
+  schedule:
+    - cron: "47 23 * * *"   # 매일 08:47 KST
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "config/**"
+      - ".github/workflows/daily.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 정책 점검
+        run: python3 scripts/check_policy.py
+
+      - name: 미국채 수집
+        run: python3 scripts/fetch_us.py
+
+      - name: 수집 결과 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+            exit 0
+          fi
+          git commit -m "data: $(date -u +%F) 일별 수집"
+          git push
