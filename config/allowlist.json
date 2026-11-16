@@ -1,11 +1,23 @@
 {
   "hosts": {
-    "home.treasury.gov": "미 재무부 — 일별 국채 수익률 곡선 (XML 피드)",
-    "www.treasurydirect.gov": "TreasuryDirect — 국채 입찰 결과·예정",
-    "api.fiscaldata.treasury.gov": "미 재무부 Fiscal Data — 국채 입찰 결과 (보조 출처)"
+    "home.treasury.gov": "미국 재무부 — 일별 국채 수익률 곡선 (XML 피드)",
+    "www.treasurydirect.gov": "미국 TreasuryDirect — 국채 입찰 결과·예정",
+    "api.fiscaldata.treasury.gov": "미국 재무부 Fiscal Data — 국채 입찰 결과 (보조 출처)",
+    "www.bankofcanada.ca": "캐나다 중앙은행 Valet — 벤치마크 국채 금리, 국채 입찰 결과",
+    "api.statistiken.bundesbank.de": "독일 분데스방크 — 연방채 지표물 금리",
+    "www.deutsche-finanzagentur.de": "독일 재무대리인 — 연방채 입찰 결과",
+    "www.bankofengland.co.uk": "영란은행 — 길트 명목 par yield",
+    "www.dmo.gov.uk": "영국 국채관리청(DMO) — 길트 발행 내역",
+    "www.mof.go.jp": "일본 재무성 — 국채 금리, 입찰 일정·결과",
+    "data-api.ecb.europa.eu": "유럽중앙은행 — 유로존 AAA 국채 수익률 곡선"
   },
   "outputs": [
-    "us.json"
+    "us.json",
+    "ca.json",
+    "de.json",
+    "uk.json",
+    "jp.json",
+    "ez.json"
   ],
   "identifiers": [
     "http://www.w3.org/2000/svg"

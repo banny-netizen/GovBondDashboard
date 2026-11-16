@@ -1,22 +1,21 @@
-"""미국채 일별 수집: 수익률 곡선과 입찰 결과·예정.
+"""미국: 재무부 수익률 곡선과 국채 입찰.
 
-출처는 모두 미 재무부 공개 데이터다.
 - 수익률 곡선: home.treasury.gov 일별 XML 피드 (월 단위 조회)
-- 입찰: TreasuryDirect, Fiscal Data 두 곳을 받아 더 최근 것을 쓴다
+- 입찰: TreasuryDirect, Fiscal Data 두 곳을 받아 결과가 더 최근까지 들어 있는 쪽을 쓴다
 """
 from __future__ import annotations
 
 import json
-import sys
 import time
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from urllib.parse import urlencode
 
 import common
-from common import ROOT, to_float, write_json
+from common import auction_row, iso_day, to_float
 
-OUT = ROOT / "docs" / "data" / "us.json"
+CODE = "us"
+NAME = "미국"
 
 CURVE_URL = (
     "https://home.treasury.gov/resource-center/data-chart-center/"
@@ -37,10 +36,7 @@ TENORS = [
     ("5Y", "BC_5YEAR"), ("7Y", "BC_7YEAR"), ("10Y", "BC_10YEAR"),
     ("20Y", "BC_20YEAR"), ("30Y", "BC_30YEAR"),
 ]
-
-CURVE_MONTHS = 13      # 곡선 이력: 최근 13개월
-AUCTION_DAYS = 90      # 입찰 이력: 최근 90일
-PENDING_DAYS = 45      # 결과가 비어 있는 입찰은 이 기간 안의 것만 보여 준다
+CURVE_MONTHS = 13
 
 # TreasuryDirect 항목 이름은 2026-11-16 실제 응답으로 확인했다.
 TD_KEYS = {
@@ -76,18 +72,14 @@ def months_back(today: date, count: int) -> list[str]:
     return out[::-1]
 
 
-def _local(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
-
-
 def parse_curve(xml_bytes: bytes) -> list[list]:
     """XML 피드 → [[날짜, 만기별 금리...], ...]"""
     rows = []
     root = ET.fromstring(xml_bytes)
     for node in root.iter():
-        if _local(node.tag) != "properties":
+        if common.local_name(node.tag) != "properties":
             continue
-        props = {_local(child.tag): (child.text or "").strip() for child in node}
+        props = {common.local_name(child.tag): (child.text or "").strip() for child in node}
         day = props.get("NEW_DATE", "")[:10]
         if len(day) != 10:
             continue
@@ -98,19 +90,22 @@ def parse_curve(xml_bytes: bytes) -> list[list]:
     return rows
 
 
-def collect_curve(today: date, errors: list[str]) -> list[list]:
-    by_day: dict[str, list] = {}
-    for ym in months_back(today, CURVE_MONTHS):
+def collect_curve(today: date, previous: dict | None, errors: list[str]) -> list[list]:
+    old = (previous or {}).get("curve", {}).get("rows") or []
+    since = common.days_ago(today, common.KEEP_DAYS)
+    # 이미 받아 둔 이력이 있으면 최근 두 달만 다시 받는다.
+    months = months_back(today, 2 if len(old) > 200 else CURVE_MONTHS)
+    new: list[list] = []
+    for ym in months:
         url = f"{CURVE_URL}?data=daily_treasury_yield_curve&field_tdr_date_value_month={ym}"
         try:
-            for row in parse_curve(common.fetch(url)):
-                by_day[row[0]] = row
+            new += parse_curve(common.fetch(url))
         except common.PolicyError:
             raise
         except Exception as exc:
             errors.append(f"수익률 곡선 {ym}: {exc}")
         time.sleep(0.3)
-    return [by_day[day] for day in sorted(by_day)]
+    return common.merge_rows(old, new, since) if new else []
 
 
 # ---------- 입찰 ----------
@@ -119,18 +114,11 @@ def _yes(value) -> bool:
     return str(value or "").strip().lower() in ("yes", "y", "true")
 
 
-def _day(value) -> str | None:
-    text = str(value or "").strip()
-    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
-        return text[:10]
-    return None
-
-
 def normalize(rec: dict, keys: dict) -> dict | None:
     """출처마다 다른 항목 이름을 한 가지 모양으로 맞춘다."""
     kind = str(rec.get(keys["type"]) or "").strip()
     term = str(rec.get(keys["term"]) or "").strip()
-    auction = _day(rec.get(keys["auction"]))
+    auction = iso_day(rec.get(keys["auction"]))
     if not (kind and term and auction):
         return None
     if _yes(rec.get(keys["tips"])):
@@ -152,55 +140,30 @@ def normalize(rec: dict, keys: dict) -> dict | None:
     else:
         rate, rate_kind = None, None
 
-    return {
-        "auction_date": auction,
-        "issue_date": _day(rec.get(keys["issue"])),
-        "maturity_date": _day(rec.get(keys["maturity"])),
-        "type": kind,
-        "term": term,
-        "offering_amt": to_float(rec.get(keys["offering"])),
-        "high_rate": rate,
-        "rate_kind": rate_kind,
-        "coupon": to_float(rec.get(keys["coupon"])),
-        "bid_to_cover": to_float(rec.get(keys["btc"])),
-        "reopening": _yes(rec.get(keys["reopening"])),
-    }
+    return auction_row(
+        auction_date=auction,
+        issue_date=iso_day(rec.get(keys["issue"])),
+        maturity=iso_day(rec.get(keys["maturity"])),
+        type=kind,
+        bill=kind in ("Bill", "CMB"),
+        term=term,
+        offering_amt=to_float(rec.get(keys["offering"])),
+        high_rate=rate,
+        rate_kind=rate_kind,
+        coupon=to_float(rec.get(keys["coupon"])),
+        bid_to_cover=to_float(rec.get(keys["btc"])),
+        tag="리오픈" if _yes(rec.get(keys["reopening"])) else "신규",
+    )
 
 
-def has_result(row: dict) -> bool:
-    return row["high_rate"] is not None or row["bid_to_cover"] is not None
-
-
-def latest_result(rows: list[dict]) -> str:
-    return max((r["auction_date"] for r in rows if has_result(r)), default="")
-
-
-def split_rows(rows: list[dict], today: date) -> tuple[list[dict], list[dict]]:
-    """결과가 나온 입찰과, 아직 결과가 없는 입찰(예정·대기)로 나눈다."""
-    seen = set()
-    unique = []
-    for row in rows:
-        key = (row["auction_date"], row["type"], row["term"], row["maturity_date"])
-        if key not in seen:
-            seen.add(key)
-            unique.append(row)
-    cutoff = (today - timedelta(days=PENDING_DAYS)).isoformat()
-    results = sorted((r for r in unique if has_result(r)),
-                     key=lambda r: r["auction_date"], reverse=True)
-    pending = sorted((r for r in unique if not has_result(r) and r["auction_date"] >= cutoff),
-                     key=lambda r: r["auction_date"])
-    return results, pending
-
-
-def fetch_treasurydirect(today: date, errors: list[str]) -> list[dict]:
-    data = json.loads(common.fetch(f"{TD_AUCTIONED_URL}?format=json&days={AUCTION_DAYS}"))
+def fetch_treasurydirect(errors: list[str]) -> list[dict]:
+    data = json.loads(common.fetch(f"{TD_AUCTIONED_URL}?format=json&days={common.AUCTION_DAYS}"))
     if not isinstance(data, list):
         raise ValueError("예상과 다른 응답 형식")
     rows = [r for r in (normalize(x, TD_KEYS) for x in data) if r]
     if data and not rows:
-        # 받긴 했는데 하나도 못 읽었으면 항목 이름이 예상과 다른 것이다. 이름을 남겨 둔다.
         first = data[0] if isinstance(data[0], dict) else {}
-        raise ValueError(f"{len(data)}건을 받았지만 읽지 못함. 항목 이름: {', '.join(sorted(first)[:60])}")
+        raise ValueError(f"{len(data)}건을 받았지만 읽지 못함. 항목 이름: {', '.join(sorted(first)[:40])}")
     if not data:
         raise ValueError("빈 목록을 받음")
     try:
@@ -213,8 +176,8 @@ def fetch_treasurydirect(today: date, errors: list[str]) -> list[dict]:
     return rows
 
 
-def fetch_fiscaldata(today: date, errors: list[str]) -> list[dict]:
-    since = (today - timedelta(days=AUCTION_DAYS)).isoformat()
+def fetch_fiscaldata(today: date) -> list[dict]:
+    since = common.days_ago(today, common.AUCTION_DAYS)
     query = urlencode(
         {"filter": f"auction_date:gte:{since}", "sort": "-auction_date", "page[size]": "500"},
         safe=":,[]",
@@ -224,74 +187,43 @@ def fetch_fiscaldata(today: date, errors: list[str]) -> list[dict]:
 
 
 def collect_auctions(today: date, errors: list[str]) -> dict | None:
-    """두 출처를 받아, 결과가 더 최근까지 들어 있는 쪽을 쓴다."""
-    best = None
-    for name, loader in (("TreasuryDirect", fetch_treasurydirect),
-                         ("Fiscal Data", fetch_fiscaldata)):
+    """TreasuryDirect를 먼저 쓰고, 실패하면 Fiscal Data(약 한 달 늦음)로 넘어간다."""
+    name, rows = "TreasuryDirect", []
+    try:
+        rows = fetch_treasurydirect(errors)
+    except common.PolicyError:
+        raise
+    except Exception as exc:
+        errors.append(f"TreasuryDirect 입찰: {exc}")
+    if not rows:
+        name = "Fiscal Data"
         try:
-            rows = loader(today, errors)
+            rows = fetch_fiscaldata(today)
         except common.PolicyError:
             raise
         except Exception as exc:
-            errors.append(f"{name} 입찰: {exc}")
-            continue
-        if not rows:
-            errors.append(f"{name} 입찰: 받은 자료가 없음")
-            continue
-        newest = latest_result(rows)
-        if best is None or newest > best[1]:
-            best = (name, newest, rows)
-    if best is None:
+            errors.append(f"Fiscal Data 입찰: {exc}")
+    if not rows:
         return None
-    results, pending = split_rows(best[2], today)
-    return {"source": best[0], "latest_result": best[1],
-            "results": results, "pending": pending}
+    results, pending = common.split_auctions(rows, today)
+    return {
+        "source": name, "rate_label": "최고 낙찰금리",
+        "amount_label": "억 달러", "amount_div": 1e8, "amount_digits": 0,
+        "latest_result": common.latest_result(rows),
+        "results": results, "pending": pending,
+    }
 
 
-# ---------- 실행 ----------
-
-def main() -> int:
-    now = datetime.now(timezone.utc)
-    today = now.date()
+def collect(today: date, previous: dict | None) -> dict:
     errors: list[str] = []
-
-    curve_rows = collect_curve(today, errors)
-    if not curve_rows:
-        print("수익률 곡선을 하나도 받지 못해 기존 파일을 그대로 둔다.")
-        for line in errors:
-            print(" -", line)
-        return 1
-
-    auctions = collect_auctions(today, errors)
-    if auctions is None and OUT.exists():
-        # 입찰 출처가 모두 실패하면 직전 수집분을 유지한다.
-        try:
-            auctions = json.loads(OUT.read_text(encoding="utf-8")).get("auctions")
-            errors.append("입찰: 이번 수집 실패, 직전 수집분 유지")
-        except Exception:
-            auctions = None
-
-    write_json(OUT, {
-        "schema": 1,
-        "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    rows = collect_curve(today, previous, errors)
+    return {
         "curve": {
+            "title": "미 재무부 Par Yield Curve",
             "tenors": [label for label, _ in TENORS],
-            "rows": curve_rows,
-        },
-        "auctions": auctions,
+            "rows": rows,
+        } if rows else None,
+        "auctions": collect_auctions(today, errors),
+        "sources": "미 재무부, TreasuryDirect",
         "errors": errors,
-    })
-
-    print(f"수익률 곡선: {len(curve_rows)}일, 최근 {curve_rows[-1][0]}")
-    if auctions:
-        print(f"입찰: 출처 {auctions['source']}, 결과 {len(auctions['results'])}건"
-              f"(최근 {auctions['latest_result'] or '없음'}), 예정·대기 {len(auctions['pending'])}건")
-    else:
-        print("입찰: 자료 없음")
-    for line in errors:
-        print("경고:", line)
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    }

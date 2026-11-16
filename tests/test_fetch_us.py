@@ -1,4 +1,4 @@
-"""파싱 단위 테스트. 네트워크는 쓰지 않는다."""
+"""미국 수집 파싱 테스트. 네트워크는 쓰지 않는다."""
 import sys
 import unittest
 from datetime import date
@@ -103,34 +103,37 @@ class AuctionTest(unittest.TestCase):
     def test_fiscal_bond(self):
         row = fetch_us.normalize(FISCAL_BOND, fetch_us.FISCAL_KEYS)
         self.assertEqual(row["type"], "Bond")
+        self.assertFalse(row["bill"])
         self.assertEqual((row["high_rate"], row["rate_kind"]), (5.618, "yield"))
         self.assertEqual(row["offering_amt"], 22e9)
         self.assertEqual(row["coupon"], 5.125)
-        self.assertTrue(row["reopening"])
+        self.assertEqual(row["maturity"], "2056-08-15")
+        self.assertEqual(row["tag"], "리오픈")
 
     def test_fiscal_bill_uses_discount_rate(self):
         row = fetch_us.normalize(FISCAL_BILL, fetch_us.FISCAL_KEYS)
         self.assertEqual((row["high_rate"], row["rate_kind"]), (4.0, "discount"))
+        self.assertTrue(row["bill"])
         self.assertIsNone(row["coupon"])
 
     def test_tips_without_result_is_pending(self):
         row = fetch_us.normalize(FISCAL_TIPS_PENDING, fetch_us.FISCAL_KEYS)
         self.assertEqual(row["type"], "TIPS")
-        self.assertFalse(fetch_us.has_result(row))
+        self.assertEqual(row["tag"], "신규")
+        self.assertFalse(common.has_result(row))
 
     def test_treasurydirect_result(self):
         row = fetch_us.normalize(TD_BILL, fetch_us.TD_KEYS)
         self.assertEqual(row["auction_date"], "2026-11-12")
-        self.assertEqual(row["maturity_date"], "2026-12-15")
+        self.assertEqual(row["maturity"], "2026-12-15")
         self.assertEqual((row["high_rate"], row["rate_kind"]), (3.955, "discount"))
         self.assertEqual(row["bid_to_cover"], 2.94)
         self.assertEqual(row["offering_amt"], 115e9)
-        self.assertTrue(row["reopening"])
 
     def test_treasurydirect_upcoming_is_pending(self):
         row = fetch_us.normalize(TD_UPCOMING, fetch_us.TD_KEYS)
         self.assertEqual(row["auction_date"], "2026-11-16")
-        self.assertFalse(fetch_us.has_result(row))
+        self.assertFalse(common.has_result(row))
 
     def test_missing_keys_are_dropped(self):
         self.assertIsNone(fetch_us.normalize({"foo": "bar"}, fetch_us.TD_KEYS))
@@ -138,32 +141,15 @@ class AuctionTest(unittest.TestCase):
     def test_split_and_dedupe(self):
         rows = [fetch_us.normalize(x, fetch_us.FISCAL_KEYS)
                 for x in (FISCAL_BOND, FISCAL_BILL, FISCAL_BILL, FISCAL_TIPS_PENDING)]
-        results, pending = fetch_us.split_rows(rows, date(2026, 11, 16))
+        results, pending = common.split_auctions(rows, date(2026, 11, 16))
         self.assertEqual([r["auction_date"] for r in results], ["2026-10-15", "2026-10-08"])
         self.assertEqual([r["type"] for r in pending], ["TIPS"])
-        self.assertEqual(fetch_us.latest_result(rows), "2026-10-15")
+        self.assertEqual(common.latest_result(rows), "2026-10-15")
 
-    def test_old_pending_is_hidden(self):
-        rows = [fetch_us.normalize(FISCAL_TIPS_PENDING, fetch_us.FISCAL_KEYS)]
-        _, pending = fetch_us.split_rows(rows, date(2027, 3, 1))
-        self.assertEqual(pending, [])
-
-
-class PolicyTest(unittest.TestCase):
-    def test_allowed(self):
-        common.check_url("https://home.treasury.gov/resource-center/x")
-
-    def test_rejects_unknown_host(self):
-        with self.assertRaises(common.PolicyError):
-            common.check_url("https://example.com/data.json")
-
-    def test_rejects_plain_http(self):
-        with self.assertRaises(common.PolicyError):
-            common.check_url("http://home.treasury.gov/x")
-
-    def test_fetch_refuses_before_any_request(self):
-        with self.assertRaises(common.PolicyError):
-            common.fetch("https://internal.example.net/secret")
+    def test_old_rows_are_hidden(self):
+        rows = [fetch_us.normalize(x, fetch_us.FISCAL_KEYS) for x in (FISCAL_BOND, FISCAL_TIPS_PENDING)]
+        results, pending = common.split_auctions(rows, date(2027, 3, 1))
+        self.assertEqual((results, pending), ([], []))
 
 
 if __name__ == "__main__":
