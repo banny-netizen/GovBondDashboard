@@ -1,0 +1,10 @@
+https://www.bankofcanada.ca/valet/observations/group/bond_yields_benchmark/json?recent=3
+https://www.bankofcanada.ca/valet/observations/group/AUC_BOND_RESULTS/json?recent=2
+https://api.statistiken.bundesbank.de/rest/download/BBSSY/D.REN.EUR.A630.000000WT1010.A?format=csv&lang=en
+https://www.deutsche-finanzagentur.de/fileadmin/user_upload/Institutionelle-investoren/auktionen/emissionsergebnisse_aktuell_en.xlsx
+https://www.dmo.gov.uk/data/XmlDataReport?reportCode=D2.1E
+https://www.dmo.gov.uk/data/XmlDataReport?reportCode=D1A
+https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Nov/2026&Dateto=now&SeriesCodes=IUDSNPY,IUDMNPY,IUDLNPY&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N
+https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_3M+SR_1Y+SR_2Y+SR_5Y+SR_10Y+SR_30Y?format=csvdata&lastNObservations=3
+https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/jgbcme.csv
+https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/historical/jgbcme_all.csv

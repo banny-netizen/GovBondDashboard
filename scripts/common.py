@@ -1,9 +1,13 @@
 """공용 함수. 허용 목록(config/allowlist.json)에 등록된 주소만 호출한다."""
 from __future__ import annotations
 
+import io
 import json
 import time
 import urllib.request
+import xml.etree.ElementTree as ET
+import zipfile
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -79,3 +83,67 @@ def write_json(path: Path, obj) -> None:
         json.dumps(obj, ensure_ascii=False, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
+
+
+def local_name(tag: str) -> str:
+    """XML 태그에서 네임스페이스를 뗀 이름."""
+    return tag.rsplit("}", 1)[-1]
+
+
+def excel_date(serial) -> str | None:
+    """엑셀 날짜 일련번호 → YYYY-MM-DD."""
+    number = to_float(serial)
+    if number is None or not 20000 <= number <= 80000:
+        return None
+    return (date(1899, 12, 30) + timedelta(days=int(number))).isoformat()
+
+
+def _column_index(ref: str) -> int:
+    index = 0
+    for ch in ref:
+        if not ch.isalpha():
+            break
+        index = index * 26 + (ord(ch.upper()) - 64)
+    return index - 1
+
+
+def xlsx_sheets(data: bytes, max_bytes: int = 30_000_000) -> list[list[list[str]]]:
+    """XLSX 파일의 시트별 행 목록. 셀은 문자열(숫자·날짜는 저장된 값 그대로)."""
+    sheets = []
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        if sum(info.file_size for info in archive.infolist()) > max_bytes:
+            raise ValueError("XLSX 압축을 풀면 너무 큼")
+        names = archive.namelist()
+        shared: list[str] = []
+        if "xl/sharedStrings.xml" in names:
+            for item in ET.fromstring(archive.read("xl/sharedStrings.xml")):
+                if local_name(item.tag) == "si":
+                    shared.append("".join(node.text or "" for node in item.iter()
+                                          if local_name(node.tag) == "t"))
+        sheet_names = sorted(
+            (n for n in names if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")),
+            key=lambda n: int("".join(ch for ch in n.rsplit("/", 1)[-1] if ch.isdigit()) or 0),
+        )
+        for name in sheet_names:
+            rows = []
+            for row in ET.fromstring(archive.read(name)).iter():
+                if local_name(row.tag) != "row":
+                    continue
+                cells: dict[int, str] = {}
+                for cell in row:
+                    if local_name(cell.tag) != "c":
+                        continue
+                    kind = cell.get("t")
+                    if kind == "inlineStr":
+                        value = "".join(node.text or "" for node in cell.iter()
+                                        if local_name(node.tag) == "t")
+                    else:
+                        value = next((node.text or "" for node in cell
+                                      if local_name(node.tag) == "v"), "")
+                        if kind == "s" and value.isdigit() and int(value) < len(shared):
+                            value = shared[int(value)]
+                    cells[_column_index(cell.get("r", "A"))] = value.strip()
+                if cells:
+                    rows.append([cells.get(i, "") for i in range(max(cells) + 1)])
+            sheets.append(rows)
+    return sheets
