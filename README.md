@@ -13,28 +13,40 @@
 
 정책은 코드로도 막아 둔다.
 
-- 수집 스크립트는 허용 목록 밖 주소를 호출하면 그 자리에서 멈춘다. 리다이렉트로 목록 밖으로 나가는 경우도 같다.
+- 수집 스크립트는 허용 목록 밖 주소를 호출하면 그 자리에서 멈춘다.
+- 상대 서버가 목록 밖 주소로 넘기려 하면(리다이렉트, 봇 확인 페이지 등) 따라가지 않고 그 출처만 실패로 처리한다. 우회하지 않는다.
 - PR과 일별 실행 때마다 `scripts/check_policy.py`가 돈다. 허용 목록 밖 주소, 등록되지 않은 데이터 파일, 엑셀·PDF 같은 수동 자료가 있으면 실패한다.
 
 ## 현재 범위
 
-| 국가 | 내용 | 출처 |
-|---|---|---|
-| 미국 | 수익률 곡선(일별), 입찰 결과·예정 | 미 재무부, TreasuryDirect, Fiscal Data |
+| 나라 | 금리 | 입찰 | 출처 |
+|---|---|---|---|
+| 미국 | Par Yield Curve, 1개월~30년 | 결과·예정 (단기채 포함) | 미 재무부, TreasuryDirect |
+| 캐나다 | 벤치마크 금리, 2~30년 | 결과·예정 (명목 국채) | 캐나다 중앙은행 |
+| 독일 | 지표물 금리, 2·5·10·30년 | 결과 (올해분) | 분데스방크, 재무대리인 |
+| 영국 | 명목 par yield, 5·10·20년 | 발행 내역 | 영란은행, 국채관리청(DMO) |
+| 일본 | 재무성 고시 금리, 1~40년 | 결과·예정 (이표채) | 재무성 |
+| 유로존 | AAA 국채 spot 곡선, 3개월~30년 | 없음 | 유럽중앙은행 |
 
-예정: 캐나다, 독일, 영국, 일본, 유로존 커브.
+알아 둘 점.
+
+- 금리의 성격이 나라마다 다르다. 미국·영국은 par yield, 독일·캐나다는 지표물 금리, 유로존은 추정 제로쿠폰 금리다.
+- 낙찰금리 기준도 다르다. 미국·캐나다·일본은 최고 낙찰금리, 독일은 평균 낙찰금리, 영국은 발행 금리다.
+- 자료가 올라오는 시점이 달라 나라마다 기준일이 다르다. 화면에 나라별 기준일을 적는다.
+- 영국 DMO는 자동 접속을 봇 확인 페이지로 넘길 때가 있다. 그때는 직전 수집분을 남기고 경고를 적는다.
 
 ## 구조
 
 ```
 config/allowlist.json        수집 허용 주소, 산출 파일 목록
-scripts/common.py            허용 목록 검사, 호출 공용 함수
-scripts/fetch_us.py          미국채 수집
+scripts/common.py            허용 목록 검사, 호출·파싱 공용 함수
+scripts/collect.py           일별 수집 (나라별로 따로 받아 쓴다)
+scripts/fetch_<코드>.py      나라별 수집: us, ca, de, uk, jp, ez
 scripts/check_policy.py      정책 점검
 scripts/probe.py             새 출처 응답 확인 (로그에만 출력)
-tests/                       파싱 단위 테스트
+tests/                       파싱 단위 테스트 (실제 응답에서 옮긴 자료 사용)
 docs/index.html              대시보드 화면 (GitHub Pages)
-docs/data/us.json            수집 결과 (자동 생성, 손으로 고치지 않는다)
+docs/data/<코드>.json        수집 결과 (자동 생성, 손으로 고치지 않는다)
 .github/workflows/daily.yml  일별 수집
 .github/workflows/policy.yml PR 점검
 .github/workflows/probe.yml  새 출처 응답 확인 (probe/ 브랜치에서만 실행)
@@ -42,7 +54,9 @@ docs/data/us.json            수집 결과 (자동 생성, 손으로 고치지 �
 
 ## 동작
 
-- 매일 08:47(KST)에 수집해서 `docs/data/`를 갱신한다. 미국 장 마감 후 재무부가 당일 곡선을 올린 뒤 시각이다.
+- 매일 08:47(KST)에 수집해서 `docs/data/`를 갱신한다.
+- 한 나라가 실패해도 다른 나라는 그대로 진행한다. 실패한 나라는 직전 수집분을 남기고 화면 아래에 경고를 적는다.
+- 금리 이력은 400일, 입찰 결과는 90일 치를 둔다.
 - 외부 라이브러리는 쓰지 않는다. 파이썬 표준 라이브러리만 쓴다.
 - 화면도 외부 스크립트나 글꼴을 불러오지 않는다.
 
@@ -51,6 +65,13 @@ docs/data/us.json            수집 결과 (자동 생성, 손으로 고치지 �
 ```
 python3 scripts/check_policy.py
 python3 -m unittest discover -s tests
-python3 scripts/fetch_us.py
+python3 scripts/collect.py
 python3 -m http.server -d docs 8000
 ```
+
+## 새 나라 붙이기
+
+1. `config/allowlist.json`에 주소와 산출 파일을 등록한다.
+2. `probe/`로 시작하는 브랜치에 `probe_urls.txt`를 올려 실제 응답 모양을 확인한다.
+3. `scripts/fetch_<코드>.py`를 만들고 `scripts/collect.py`의 목록에 넣는다. 테스트 자료는 실제 응답에서 옮긴다.
+4. `docs/index.html`의 나라 목록에 추가한다.

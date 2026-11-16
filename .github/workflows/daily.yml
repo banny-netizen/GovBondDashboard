@@ -23,13 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 정책 점검
         run: python3 scripts/check_policy.py
 
-      - name: 미국채 수집
-        run: python3 scripts/fetch_us.py
+      - name: 나라별 수집
+        run: python3 scripts/collect.py
 
       - name: 수집 결과 커밋
         run: |

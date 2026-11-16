@@ -12,8 +12,10 @@
   --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
   --grid: #e1e0d9; --axis: #c3c2b7;
   --border: rgba(11,11,11,.10); --wash: rgba(11,11,11,.05);
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;      /* 만기별 계열 */
-  --o1: #104281; --o2: #2a78d6; --o3: #86b6ef;      /* 시점별 계열: 최근일수록 진하게 */
+  /* 계열 색: 종합 탭에서는 나라, 나라 탭에서는 만기 */
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+  /* 시점 비교: 최근일수록 진하게 */
+  --o1: #104281; --o2: #2a78d6; --o3: #86b6ef;
 }
 @media (prefers-color-scheme: dark) {
   .viz-root {
@@ -22,32 +24,48 @@
     --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835;
     --border: rgba(255,255,255,.10); --wash: rgba(255,255,255,.06);
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
-    --o1: #9ec5f4; --o2: #3987e5; --o3: #184f95;    /* 어두운 바탕에서는 최근일수록 밝게 */
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c;
+    --o1: #9ec5f4; --o2: #3987e5; --o3: #184f95;
   }
 }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--page); color: var(--ink);
-  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
 }
-main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
-h1 { font-size: 22px; margin: 0 0 4px; }
-h2 { font-size: 15px; margin: 0; }
-.sub { color: var(--ink2); margin: 0; }
-.note { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+main { max-width: 1240px; margin: 0 auto; padding: 14px 16px 20px; }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; }
+h1 { font-size: 19px; margin: 0; }
+h2 { font-size: 14px; margin: 0; }
+.sub { color: var(--ink2); margin: 0; font-size: 13px; }
+.note { color: var(--muted); font-size: 12px; margin: 0; }
+.tabs { display: flex; gap: 2px; margin-top: 8px; border-bottom: 1px solid var(--axis); overflow-x: auto; }
+.tabs button {
+  font: inherit; color: var(--ink2); background: transparent; border: 0;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 7px 14px; cursor: pointer; white-space: nowrap;
+}
+.tabs button:hover { background: var(--wash); }
+.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; margin-top: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.tile .label { color: var(--ink2); font-size: 12px; }
+.tile .value { font-size: 21px; font-weight: 600; line-height: 1.25; }
+.tile .delta { color: var(--ink2); font-size: 12px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; }
+.toolbar .grow { flex: 1 1 200px; }
+.flabel { color: var(--ink2); font-size: 12px; }
+.pair { display: inline-flex; align-items: center; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 16px; margin-top: 16px;
+  border-radius: 10px; padding: 10px 12px; min-width: 0;
 }
-.card-head { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
-.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
-.tile .label { color: var(--ink2); font-size: 13px; }
-.tile .value { font-size: 26px; font-weight: 600; line-height: 1.25; }
-.tile .delta { color: var(--ink2); font-size: 12px; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink2); font-size: 12px; }
-.lg { display: inline-flex; align-items: center; gap: 6px; }
+.card.wide { margin-top: 10px; }
+.card-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 12px; color: var(--ink2); font-size: 12px; }
+.lg { display: inline-flex; align-items: center; gap: 5px; }
 .key { display: inline-block; width: 14px; height: 2px; border-radius: 1px; flex: none; }
 .chart { position: relative; }
 .chart svg { display: block; max-width: 100%; height: auto; outline-offset: 2px; }
@@ -61,102 +79,47 @@ h2 { font-size: 15px; margin: 0; }
 .tip {
   position: absolute; pointer-events: none; z-index: 2; min-width: 120px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  padding: 7px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
 }
-.tip-h { color: var(--ink2); margin-bottom: 4px; }
+.tip-h { color: var(--ink2); margin-bottom: 3px; }
 .tip-r { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .tip-r strong { font-variant-numeric: tabular-nums; }
 .tip-n { color: var(--ink2); }
-.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 24px; }
-.filters .flabel { color: var(--ink2); font-size: 13px; }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .seg button {
-  font: inherit; font-size: 13px; color: var(--ink2); background: transparent;
-  border: 0; padding: 5px 12px; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--ink2); background: transparent;
+  border: 0; padding: 4px 11px; cursor: pointer; white-space: nowrap;
 }
 .seg button:hover { background: var(--wash); }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 600; }
-.tablewrap { overflow-x: auto; }
+/* 표는 남는 화면 높이만큼만 쓰고 그 안에서 스크롤한다 */
+.scroll { max-height: max(190px, calc(100vh - 664px)); overflow: auto; }
+.card.wide > .note { margin-top: 8px; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
-th, td { padding: 6px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--grid); }
-th { color: var(--ink2); font-weight: 600; border-bottom-color: var(--axis); }
+th, td { padding: 4px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th {
+  color: var(--ink2); font-weight: 600; position: sticky; top: 0;
+  background: var(--surface); box-shadow: inset 0 -1px 0 var(--axis);
+}
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td .chg { color: var(--muted); }
 tbody tr:last-child td { border-bottom: 0; }
-footer { color: var(--ink2); font-size: 12px; margin-top: 24px; }
-footer p { margin: 4px 0; }
-footer a { color: inherit; }
-details { margin-top: 6px; }
+footer { color: var(--ink2); font-size: 12px; margin-top: 12px; }
+footer p { margin: 3px 0; }
+details { margin-top: 4px; }
 </style>
 </head>
 <body class="viz-root">
 <main>
-  <header>
+  <div class="top">
     <h1>외화 국채 정보 대시보드</h1>
-    <p class="sub" id="asof">미국 국채</p>
-  </header>
-
-  <p class="card" id="empty" hidden>아직 수집된 자료가 없습니다. 첫 수집이 끝나면 표시됩니다.</p>
-
-  <div id="content" hidden>
-    <section class="tiles" id="tiles" aria-label="주요 만기 금리"></section>
-
-    <section class="card">
-      <div class="card-head">
-        <div>
-          <h2>수익률 곡선</h2>
-          <p class="note">미 재무부 Par Yield Curve. 최근 영업일과 1주 전, 1개월 전 비교.</p>
-        </div>
-        <div class="legend" id="curve-legend"></div>
-      </div>
-      <div class="chart" id="curve-chart"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>만기별 금리</h2></div>
-      <div class="tablewrap" id="curve-table"></div>
-    </section>
-
-    <div class="filters">
-      <span class="flabel">기간</span>
-      <div class="seg" id="range" role="group" aria-label="금리 추이 기간"></div>
-    </div>
-
-    <section class="card">
-      <div class="card-head">
-        <div>
-          <h2>금리 추이</h2>
-          <p class="note">2년·10년·30년 일별 금리.</p>
-        </div>
-        <div class="legend" id="trend-legend"></div>
-      </div>
-      <div class="chart" id="trend-chart"></div>
-    </section>
-
-    <div class="filters">
-      <span class="flabel">입찰 종류</span>
-      <div class="seg" id="kind" role="group" aria-label="입찰 종류"></div>
-    </div>
-
-    <section class="card">
-      <div class="card-head">
-        <h2>입찰 결과</h2>
-        <p class="note" id="auction-note"></p>
-      </div>
-      <div class="tablewrap" id="result-table"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-head">
-        <h2>입찰 예정·결과 대기</h2>
-        <p class="note">공고됐지만 결과가 아직 올라오지 않은 입찰.</p>
-      </div>
-      <div class="tablewrap" id="pending-table"></div>
-    </section>
+    <p class="sub" id="asof"></p>
   </div>
-
+  <nav class="tabs" id="tabs" role="tablist" aria-label="국가"></nav>
+  <div id="view" role="tabpanel"></div>
   <footer>
-    <p>출처: <a href="https://home.treasury.gov/policy-issues/financing-the-government/interest-rate-statistics">미 재무부 금리 통계</a>, TreasuryDirect, 미 재무부 Fiscal Data. 모두 공개 자료이며 매일 08:47(KST)에 자동 수집합니다.</p>
-    <p>이 화면은 공개 API에서 받은 자료만 보여 줍니다. 참고용이며 투자 권유가 아닙니다.</p>
+    <p id="sources"></p>
+    <p>공개 API에서 받은 자료만 보여 줍니다. 매일 08:47(KST)에 자동 수집하며, 참고용이고 투자 권유가 아닙니다.</p>
     <details id="warn" hidden><summary></summary><ul id="warn-list"></ul></details>
   </footer>
 </main>
@@ -182,70 +145,63 @@ details { margin-top: 6px; }
     return e;
   };
 
-  let data;
-  try {
-    const res = await fetch('data/us.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error(String(res.status));
-    data = await res.json();
-    if (!data.curve || !data.curve.rows || !data.curve.rows.length) throw new Error('empty');
-  } catch (err) {
-    $('empty').hidden = false;
-    return;
-  }
-  $('content').hidden = false;
+  const AREAS = [
+    { code: 'us', name: '미국', color: '--s1' },
+    { code: 'ca', name: '캐나다', color: '--s2' },
+    { code: 'de', name: '독일', color: '--s3' },
+    { code: 'uk', name: '영국', color: '--s4' },
+    { code: 'jp', name: '일본', color: '--s5' },
+    { code: 'ez', name: '유로존', color: '--s6' },
+  ];
+  await Promise.all(AREAS.map(async (area) => {
+    try {
+      const res = await fetch('data/' + area.code + '.json', { cache: 'no-store' });
+      const d = res.ok ? await res.json() : null;
+      area.data = d && d.curve && d.curve.rows && d.curve.rows.length ? d : null;
+    } catch (err) {
+      area.data = null;
+    }
+  }));
+  const loaded = AREAS.filter((a) => a.data);
 
-  // ---------- 공통 계산 ----------
-  const tenors = data.curve.tenors;
-  const rows = data.curve.rows;                 // [날짜, 만기별 금리...] 날짜 오름차순
-  const last = rows[rows.length - 1];
-  const prev = rows.length > 1 ? rows[rows.length - 2] : null;
-  const col = (t) => tenors.indexOf(t) + 1;
+  // ---------- 계산 ----------
+  const bp = (a, b) => (a == null || b == null) ? null : Math.round((a - b) * 100);
+  const fmtBp = (v) => v == null ? '–' : v === 0 ? '0' : (v > 0 ? '+' : '−') + Math.abs(v);
+  const fmtNum = (v, digits) => v == null ? '–' : v.toFixed(digits == null ? 2 : digits);
+  const tenorKo = (t) => t.replace('M', '개월').replace('Y', '년');
+  const termKo = (t) => String(t).replace(/-Year/g, '년').replace(/-Month/g, '개월').replace(/-Week/g, '주').replace(/-Day/g, '일');
+  const moved = (d) => d == null ? '전일 자료 없음' : d === 0 ? '전일과 같음' : (d > 0 ? '▲ ' : '▼ ') + Math.abs(d) + 'bp 전일 대비';
+  const kst = (iso) => {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const k = new Date(d.getTime() + 9 * 3600 * 1000).toISOString();
+    return k.slice(0, 10) + ' ' + k.slice(11, 16) + ' KST';
+  };
   const shiftDay = (iso, days) => {
     const d = new Date(iso + 'T00:00:00Z');
     d.setUTCDate(d.getUTCDate() - days);
     return d.toISOString().slice(0, 10);
   };
-  const rowOnOrBefore = (iso) => {
-    for (let i = rows.length - 1; i >= 0; i--) if (rows[i][0] <= iso) return rows[i];
-    return null;
-  };
-  const week = rowOnOrBefore(shiftDay(last[0], 7));
-  const month = rowOnOrBefore(shiftDay(last[0], 30));
-  const bp = (a, b) => (a == null || b == null) ? null : Math.round((a - b) * 100);
-  const fmtBp = (v) => v == null ? '–' : v === 0 ? '0' : (v > 0 ? '+' : '−') + Math.abs(v);
-  const fmtPct = (v, digits) => v == null ? '–' : v.toFixed(digits == null ? 2 : digits);
-  const tenorKo = (t) => t.replace('M', '개월').replace('Y', '년');
-  const kst = (iso) => {
-    const d = new Date(iso);
-    if (isNaN(d)) return iso;
-    const k = new Date(d.getTime() + 9 * 3600 * 1000).toISOString();
-    return k.slice(0, 10) + ' ' + k.slice(11, 16) + ' KST';
-  };
+  // 한 나라 곡선에서 자주 쓰는 값들
+  function curveOf(d) {
+    const tenors = d.curve.tenors, rows = d.curve.rows;
+    const last = rows[rows.length - 1];
+    const prev = rows.length > 1 ? rows[rows.length - 2] : null;
+    const onOrBefore = (iso) => {
+      for (let i = rows.length - 1; i >= 0; i--) if (rows[i][0] <= iso) return rows[i];
+      return null;
+    };
+    const week = onOrBefore(shiftDay(last[0], 7));
+    const month = onOrBefore(shiftDay(last[0], 30));
+    const col = (t) => tenors.indexOf(t) + 1;
+    const has = (t) => tenors.includes(t) && last[col(t)] != null;
+    return { tenors, rows, last, prev, col, has,
+             week: week && week !== last ? week : null,
+             month: month && month !== last && month !== week ? month : null };
+  }
+  const firstOf = (c, list) => list.find((t) => c.has(t));
 
-  $('asof').textContent = '미국 국채 · 기준일 ' + last[0] + ' (미국 현지) · 수집 ' + kst(data.generated_at);
-
-  // ---------- 주요 만기 ----------
-  (function tiles() {
-    const host = $('tiles');
-    const moved = (d, unit) => d == null ? '전일 자료 없음'
-      : d === 0 ? '전일과 같음'
-      : (d > 0 ? '▲ ' : '▼ ') + Math.abs(d) + unit + ' 전일 대비';
-    for (const [label, t] of [['2년', '2Y'], ['5년', '5Y'], ['10년', '10Y'], ['30년', '30Y']]) {
-      const v = last[col(t)];
-      host.append(h('div', { class: 'tile' },
-        h('div', { class: 'label', text: label }),
-        h('div', { class: 'value', text: v == null ? '–' : v.toFixed(2) + '%' }),
-        h('div', { class: 'delta', text: moved(bp(v, prev && prev[col(t)]), 'bp') })));
-    }
-    const spread = bp(last[col('10Y')], last[col('2Y')]);
-    const spreadPrev = prev ? bp(prev[col('10Y')], prev[col('2Y')]) : null;
-    host.append(h('div', { class: 'tile' },
-      h('div', { class: 'label', text: '10년 − 2년' }),
-      h('div', { class: 'value', text: spread == null ? '–' : fmtBp(spread) + 'bp' }),
-      h('div', { class: 'delta', text: moved(spread == null || spreadPrev == null ? null : spread - spreadPrev, 'bp') })));
-  })();
-
-  // ---------- 꺾은선 차트 ----------
+  // ---------- 공통 부품 ----------
   function legend(host, items) {
     host.textContent = '';
     for (const it of items) {
@@ -253,6 +209,44 @@ details { margin-top: 6px; }
       key.style.background = 'var(' + it.color + ')';
       host.append(h('span', { class: 'lg' }, key, h('span', { text: it.name })));
     }
+  }
+
+  function segmented(labels, selected, onPick, label) {
+    const host = h('div', { class: 'seg', role: 'group', 'aria-label': label });
+    labels.forEach((text, i) => {
+      const b = h('button', { type: 'button', text: text, 'aria-pressed': String(i === selected) });
+      b.addEventListener('click', () => {
+        [...host.children].forEach((c, k) => c.setAttribute('aria-pressed', String(k === i)));
+        onPick(i);
+      });
+      host.append(b);
+    });
+    return host;
+  }
+
+  function table(host, cols, body, emptyText) {
+    host.textContent = '';
+    // 값이 하나도 없는 열은 감춘다
+    const keep = cols.map((c, i) => c.always || body.some((r) => r[i] !== '–' && r[i] !== ''));
+    if (!body.length) {
+      host.append(h('p', { class: 'note', text: emptyText }));
+      return;
+    }
+    const head = h('tr');
+    cols.forEach((c, i) => { if (keep[i]) head.append(h('th', { text: c.name, class: c.num ? 'num' : '', scope: 'col' })); });
+    const tbody = h('tbody');
+    for (const r of body) {
+      const tr = h('tr');
+      r.forEach((cell, i) => {
+        if (!keep[i]) return;
+        const td = h('td', { class: cols[i].num ? 'num' : '' });
+        if (Array.isArray(cell)) td.append(cell[0], h('span', { class: 'chg', text: ' ' + cell[1] }));
+        else td.textContent = cell;
+        tr.append(td);
+      });
+      tbody.append(tr);
+    }
+    host.append(h('table', null, h('thead', null, head), tbody));
   }
 
   function lineChart(host, cfg) {
@@ -263,13 +257,13 @@ details { margin-top: 6px; }
       host.append(h('p', { class: 'note', text: '표시할 자료가 없습니다.' }));
       return;
     }
-    const W = Math.max(300, Math.floor(host.clientWidth));
-    const H = 280;
-    const m = { t: 10, r: cfg.endLabels ? 52 : 16, b: 26, l: 38 };
+    const W = Math.max(280, Math.floor(host.clientWidth));
+    const H = 214;
+    const m = { t: 8, r: cfg.endLabels ? 50 : 16, b: 24, l: 36 };
 
     let lo = Math.min(...all), hi = Math.max(...all);
     const span = Math.max(hi - lo, 0.05);
-    const step = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2].find((st) => span * 1.08 / st <= 6) || 5;
+    const step = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2].find((st) => span * 1.08 / st <= 5) || 5;
     lo = Math.floor((lo - span * 0.04) / step) * step;
     hi = Math.ceil((hi + span * 0.04) / step) * step;
     const steps = Math.round((hi - lo) / step);
@@ -278,7 +272,6 @@ details { margin-top: 6px; }
     const y = (v) => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
 
     const svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, role: 'img', tabindex: '0', 'aria-label': cfg.aria });
-
     for (let i = 0; i <= steps; i++) {
       const v = lo + i * step;
       svg.append(s('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: i === 0 ? 'axis' : 'grid' }));
@@ -286,8 +279,8 @@ details { margin-top: 6px; }
       t.textContent = v.toFixed(digits);
       svg.append(t);
     }
-    for (const i of cfg.ticks(W)) {
-      const t = s('text', { x: x(i), y: H - 8, 'text-anchor': 'middle', class: 'tick' });
+    for (const i of cfg.ticks(W - m.l - m.r)) {
+      const t = s('text', { x: x(i), y: H - 7, 'text-anchor': 'middle', class: 'tick' });
       t.textContent = cfg.tickLabel ? cfg.tickLabel(i) : cfg.labels[i];
       svg.append(t);
     }
@@ -296,7 +289,7 @@ details { margin-top: 6px; }
     for (const sr of cfg.series.slice().reverse()) {
       let d = '', pen = false;
       sr.values.forEach((v, i) => {
-        if (v == null) { pen = false; return; }
+        if (v == null) { if (!cfg.connectGaps) pen = false; return; }
         d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1);
         pen = true;
       });
@@ -313,7 +306,7 @@ details { margin-top: 6px; }
         if (i >= 0) ends.push({ sr: sr, i: i, v: sr.values[i] });
       }
       const ys = ends.map((e) => y(e.v)).sort((a, b) => a - b);
-      const crowded = ys.some((v, k) => k > 0 && v - ys[k - 1] < 13);
+      const crowded = ys.some((v, k) => k > 0 && v - ys[k - 1] < 13) || ends.some((e) => e.i !== n - 1);
       for (const e of ends) {
         const dot = s('circle', { cx: x(e.i), cy: y(e.v), r: 4, class: 'dot' });
         dot.style.fill = 'var(' + e.sr.color + ')';
@@ -369,7 +362,7 @@ details { margin-top: 6px; }
       let left = x(i) * scale + 12;
       if (left + tw > host.clientWidth - 4) left = x(i) * scale - 12 - tw;
       tip.style.left = Math.max(4, left) + 'px';
-      tip.style.top = (m.t + 4) + 'px';
+      tip.style.top = (m.t + 2) + 'px';
     };
     const hide = () => {
       cross.style.display = 'none';
@@ -392,149 +385,325 @@ details { margin-top: 6px; }
     });
   }
 
-  // ---------- 수익률 곡선 ----------
-  const curveSeries = [{ name: '최근 (' + last[0] + ')', color: '--o1', values: last.slice(1) }];
-  if (week && week !== last) curveSeries.push({ name: '1주 전 (' + week[0] + ')', color: '--o2', values: week.slice(1) });
-  if (month && month !== last && month !== week) curveSeries.push({ name: '1개월 전 (' + month[0] + ')', color: '--o3', values: month.slice(1) });
-  const mainTenors = ['1M', '3M', '1Y', '2Y', '5Y', '10Y', '30Y'];
-  function drawCurve() {
-    legend($('curve-legend'), curveSeries);
-    lineChart($('curve-chart'), {
-      labels: tenors,
-      series: curveSeries,
-      aria: '미국 국채 수익률 곡선. 좌우 화살표로 만기별 값을 읽을 수 있습니다.',
-      ticks: (W) => tenors.map((t, i) => i).filter((i) => W >= 560 || mainTenors.includes(tenors[i])),
-      tipLabel: (i) => tenorKo(tenors[i]),
-    });
-  }
-
-  (function curveTable() {
-    const cols = [
-      { name: '만기' },
-      { name: '최근 (%)', num: true },
-      { name: '전일 대비 (bp)', num: true },
-      { name: '1주 전 대비 (bp)', num: true },
-      { name: '1개월 전 대비 (bp)', num: true },
-    ];
-    const body = tenors.map((t, i) => {
-      const v = last[i + 1];
-      return [tenorKo(t), fmtPct(v),
-        fmtBp(bp(v, prev && prev[i + 1])),
-        fmtBp(bp(v, week && week !== last ? week[i + 1] : null)),
-        fmtBp(bp(v, month && month !== last ? month[i + 1] : null))];
-    });
-    table($('curve-table'), cols, body, '');
-  })();
-
-  // ---------- 금리 추이 ----------
-  const trendDefs = [['2년', '2Y', '--s1'], ['10년', '10Y', '--s2'], ['30년', '30Y', '--s3']];
-  const ranges = [['1개월', 22], ['3개월', 66], ['6개월', 130], ['1년', 9999]];
-  let rangeIdx = 1;
-  function drawTrend() {
-    const part = rows.slice(-ranges[rangeIdx][1]);
-    const series = trendDefs.map(([name, t, color]) => ({ name: name, color: color, values: part.map((r) => r[col(t)]) }));
-    legend($('trend-legend'), series);
-    const long = part.length > 70;
-    lineChart($('trend-chart'), {
-      labels: part.map((r) => r[0]),
-      series: series,
-      endLabels: true,
-      aria: '미국 국채 2년, 10년, 30년 금리 추이. 좌우 화살표로 날짜별 값을 읽을 수 있습니다.',
-      ticks: (W) => {
-        const want = W >= 560 ? 6 : 4;
-        const out = [];
-        for (let k = 0; k < want; k++) out.push(Math.round(k * (part.length - 1) / (want - 1)));
-        return [...new Set(out)];
-      },
-      tickLabel: (i) => long ? part[i][0].slice(2, 7).replace('-', '.') : part[i][0].slice(5).replace('-', '/'),
-    });
-  }
-
-  function segmented(host, labels, selected, onPick) {
-    host.textContent = '';
-    labels.forEach((label, i) => {
-      const b = h('button', { type: 'button', text: label, 'aria-pressed': String(i === selected) });
-      b.addEventListener('click', () => {
-        [...host.children].forEach((c, k) => c.setAttribute('aria-pressed', String(k === i)));
-        onPick(i);
-      });
-      host.append(b);
-    });
-  }
-  segmented($('range'), ranges.map((r) => r[0]), rangeIdx, (i) => { rangeIdx = i; drawTrend(); });
-
-  // ---------- 표 ----------
-  function table(host, cols, body, emptyText) {
-    host.textContent = '';
-    if (!body.length) {
-      host.append(h('p', { class: 'note', text: emptyText }));
-      return;
+  // 눈금 후보 가운데 서로 minGap 픽셀 넘게 떨어진 것만 남긴다
+  const spaced = (candidates, plotW, count, minGap) => {
+    const out = [];
+    let lastX = -Infinity;
+    for (const i of candidates) {
+      const px = plotW * i / (count - 1);
+      if (px - lastX >= minGap) { out.push(i); lastX = px; }
     }
-    const thead = h('tr');
-    for (const c of cols) thead.append(h('th', { text: c.name, class: c.num ? 'num' : '', scope: 'col' }));
-    const tbody = h('tbody');
-    for (const r of body) {
-      const tr = h('tr');
-      r.forEach((cell, i) => tr.append(h('td', { text: cell, class: cols[i].num ? 'num' : '' })));
-      tbody.append(tr);
-    }
-    host.append(h('table', null, h('thead', null, thead), tbody));
+    return out;
+  };
+  const evenTicks = (count, want) => {
+    const out = [];
+    for (let k = 0; k < want; k++) out.push(Math.round(k * (count - 1) / (want - 1)));
+    return [...new Set(out)];
+  };
+  const dateTick = (days) => (i) => days.length > 70
+    ? days[i].slice(2, 7).replace('-', '.')
+    : days[i].slice(5).replace('-', '/');
+
+  // ---------- 화면 상태 ----------
+  const RANGES = [['1개월', 22], ['3개월', 66], ['6개월', 130], ['1년', 9999]];
+  const KINDS = [['이표채', (r) => !r.bill], ['단기채', (r) => r.bill], ['전체', () => true]];
+  const state = { tab: 'all', range: 1, bottom: 0, kind: 0 };
+  let redrawCharts = () => {};
+
+  function card(title, withLegend) {
+    const legendBox = withLegend ? h('div', { class: 'legend' }) : null;
+    const body = h('div', { class: 'chart' });
+    const box = h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('h2', { text: title }), legendBox), body);
+    return { box, body, legendBox };
   }
 
-  // ---------- 입찰 ----------
-  const auctions = data.auctions || { results: [], pending: [] };
-  const kinds = [
-    ['이표채', (r) => ['Note', 'Bond', 'TIPS', 'FRN'].includes(r.type)],
-    ['단기채', (r) => ['Bill', 'CMB'].includes(r.type)],
-    ['전체', () => true],
-  ];
-  let kindIdx = 0;
-  const termKo = (t) => String(t).replace(/-Year/g, '년').replace(/-Month/g, '개월').replace(/-Week/g, '주').replace(/-Day/g, '일');
-  const amount = (v) => v == null ? '–' : Math.round(v / 1e8).toLocaleString('ko-KR');
+  function rangeBar(noteText, onChange) {
+    return h('div', { class: 'toolbar' },
+      h('p', { class: 'note grow', text: noteText }),
+      h('div', { class: 'pair' },
+        h('span', { class: 'flabel', text: '추이 기간' }),
+        segmented(RANGES.map((r) => r[0]), state.range, (i) => { state.range = i; onChange(); }, '금리 추이 기간')));
+  }
+
+  const amountText = (a, v) => v == null ? '–'
+    : (v / (a.amount_div || 1e8)).toLocaleString('ko-KR', {
+        minimumFractionDigits: a.amount_digits || 0, maximumFractionDigits: a.amount_digits || 0 });
   const rateText = (r) => r.high_rate == null ? '–'
     : r.high_rate.toFixed(3) + (r.rate_kind === 'discount' ? ' 할인율' : r.rate_kind === 'margin' ? ' 가산금리' : '');
-  function drawAuctions() {
-    const pick = kinds[kindIdx][1];
-    table($('result-table'), [
-      { name: '입찰일' }, { name: '종류' }, { name: '만기' },
-      { name: '발행액 (억 달러)', num: true }, { name: '낙찰금리 (%)', num: true },
-      { name: '응찰률 (배)', num: true }, { name: '표면금리 (%)', num: true }, { name: '구분' },
-    ], (auctions.results || []).filter(pick).slice(0, 25).map((r) => [
-      r.auction_date, r.type, termKo(r.term), amount(r.offering_amt), rateText(r),
-      fmtPct(r.bid_to_cover), fmtPct(r.coupon, 3), r.reopening ? '리오픈' : '신규',
-    ]), '해당하는 입찰 결과가 없습니다.');
-    table($('pending-table'), [
-      { name: '입찰일' }, { name: '발행일' }, { name: '종류' }, { name: '만기' },
-      { name: '발행액 (억 달러)', num: true }, { name: '구분' },
-    ], (auctions.pending || []).filter(pick).map((r) => [
-      r.auction_date, r.issue_date || '–', r.type, termKo(r.term), amount(r.offering_amt),
-      r.reopening ? '리오픈' : '신규',
-    ]), '해당하는 입찰이 없습니다.');
-  }
-  $('auction-note').textContent = auctions.source
-    ? '출처 ' + auctions.source + ' · 결과 반영 ' + (auctions.latest_result || '없음') + '까지'
-    : '입찰 자료를 받지 못했습니다.';
-  segmented($('kind'), kinds.map((k) => k[0]), kindIdx, (i) => { kindIdx = i; drawAuctions(); });
+  const maturityText = (r) => r.term ? termKo(r.term) : r.maturity ? r.maturity.slice(0, 4) + '년 만기' : '–';
 
-  // ---------- 수집 경고 ----------
-  if (data.errors && data.errors.length) {
+  // ---------- 나라 탭 ----------
+  function renderArea(area, view) {
+    const d = area.data;
+    const c = curveOf(d);
+    const auctions = d.auctions;
+
+    // 주요 만기
+    const tiles = h('section', { class: 'tiles', 'aria-label': '주요 만기 금리' });
+    const picks = ['2Y', '5Y', '10Y', '20Y', '30Y'].filter((t) => c.has(t));
+    if (picks.includes('20Y') && picks.includes('30Y')) picks.splice(picks.indexOf('20Y'), 1);
+    for (const t of picks) {
+      const v = c.last[c.col(t)];
+      tiles.append(h('div', { class: 'tile' },
+        h('div', { class: 'label', text: tenorKo(t) }),
+        h('div', { class: 'value', text: v.toFixed(2) + '%' }),
+        h('div', { class: 'delta', text: moved(bp(v, c.prev && c.prev[c.col(t)])) })));
+    }
+    const shortT = firstOf(c, ['2Y', '5Y']), longT = firstOf(c, ['10Y', '20Y', '30Y']);
+    if (shortT && longT && shortT !== longT) {
+      const spread = bp(c.last[c.col(longT)], c.last[c.col(shortT)]);
+      const before = c.prev ? bp(c.prev[c.col(longT)], c.prev[c.col(shortT)]) : null;
+      tiles.append(h('div', { class: 'tile' },
+        h('div', { class: 'label', text: tenorKo(longT) + ' − ' + tenorKo(shortT) }),
+        h('div', { class: 'value', text: fmtBp(spread) + 'bp' }),
+        h('div', { class: 'delta', text: moved(before == null ? null : spread - before) })));
+    }
+
+    // 차트 두 개
+    const curveCard = card('수익률 곡선', true);
+    const trendCard = card('금리 추이', true);
+    const curveSeries = [{ name: '최근 (' + c.last[0] + ')', color: '--o1', values: c.last.slice(1) }];
+    if (c.week) curveSeries.push({ name: '1주 전 (' + c.week[0] + ')', color: '--o2', values: c.week.slice(1) });
+    if (c.month) curveSeries.push({ name: '1개월 전 (' + c.month[0] + ')', color: '--o3', values: c.month.slice(1) });
+    const mainTenors = ['1M', '3M', '1Y', '2Y', '5Y', '10Y', '20Y', '30Y', '40Y'];
+    const trendTenors = [...new Set([firstOf(c, ['2Y', '5Y', '1Y']), firstOf(c, ['10Y']), firstOf(c, ['30Y', '20Y'])].filter(Boolean))];
+    const trendColors = ['--s1', '--s2', '--s3'];
+    const drawCharts = () => {
+      legend(curveCard.legendBox, curveSeries);
+      lineChart(curveCard.body, {
+        labels: c.tenors, series: curveSeries, connectGaps: true,
+        aria: area.name + ' 국채 수익률 곡선. 좌우 화살표로 만기별 값을 읽을 수 있습니다.',
+        ticks: (plotW) => spaced(c.tenors.map((t, i) => i).filter((i) => plotW / c.tenors.length >= 30 || mainTenors.includes(c.tenors[i])),
+          plotW, c.tenors.length, 28),
+        tipLabel: (i) => tenorKo(c.tenors[i]),
+      });
+      const part = c.rows.slice(-RANGES[state.range][1]);
+      const days = part.map((r) => r[0]);
+      const series = trendTenors.map((t, k) => ({ name: tenorKo(t), color: trendColors[k], values: part.map((r) => r[c.col(t)]) }));
+      legend(trendCard.legendBox, series);
+      lineChart(trendCard.body, {
+        labels: days, series: series, endLabels: true, connectGaps: true,
+        aria: area.name + ' 국채 금리 추이. 좌우 화살표로 날짜별 값을 읽을 수 있습니다.',
+        ticks: (plotW) => evenTicks(days.length, plotW >= 420 ? 5 : 4),
+        tickLabel: dateTick(days),
+      });
+    };
+
+    // 아래 표: 만기별 금리 / 입찰 결과 / 입찰 예정
+    const bottom = h('section', { class: 'card wide' });
+    const controls = h('div', { class: 'card-head' });
+    const tableBox = h('div', { class: 'scroll' });
+    const noteBox = h('p', { class: 'note' });
+    bottom.append(controls, tableBox, noteBox);
+    const views = ['만기별 금리'];
+    if (auctions) {
+      views.push('입찰 결과 ' + auctions.results.length + '건');
+      if (auctions.pending && auctions.pending.length) views.push('입찰 예정 ' + auctions.pending.length + '건');
+    }
+    if (state.bottom >= views.length) state.bottom = 0;
+    const allRows = auctions ? auctions.results.concat(auctions.pending || []) : [];
+    const mixed = allRows.some((r) => r.bill) && allRows.some((r) => !r.bill);
+    const drawBottom = () => {
+      controls.textContent = '';
+      controls.append(views.length > 1
+        ? segmented(views, state.bottom, (i) => { state.bottom = i; drawBottom(); }, '표 종류')
+        : h('h2', { text: views[0] }));
+      const pick = mixed ? KINDS[state.kind][1] : () => true;
+      if (state.bottom > 0 && mixed) {
+        controls.append(segmented(KINDS.map((k) => k[0]), state.kind, (i) => { state.kind = i; drawBottom(); }, '입찰 종류'));
+      }
+      if (state.bottom === 0) {
+        table(tableBox, [
+          { name: '만기', always: true }, { name: '최근 (%)', num: true, always: true },
+          { name: '전일 대비 (bp)', num: true }, { name: '1주 전 대비 (bp)', num: true }, { name: '1개월 전 대비 (bp)', num: true },
+        ], c.tenors.map((t, i) => {
+          const v = c.last[i + 1];
+          return [tenorKo(t), fmtNum(v), fmtBp(bp(v, c.prev && c.prev[i + 1])),
+                  fmtBp(bp(v, c.week && c.week[i + 1])), fmtBp(bp(v, c.month && c.month[i + 1]))];
+        }), '');
+        noteBox.textContent = [d.curve.title, d.curve.note].filter(Boolean).join(' · ');
+      } else if (views[state.bottom].startsWith('입찰 결과')) {
+        table(tableBox, [
+          { name: '입찰일', always: true }, { name: '종류' }, { name: '만기' },
+          { name: '발행액 (' + (auctions.amount_label || '억') + ')', num: true },
+          { name: (auctions.rate_label || '낙찰금리') + ' (%)', num: true },
+          { name: '응찰률 (배)', num: true }, { name: '표면금리 (%)', num: true }, { name: '구분' },
+        ], auctions.results.filter(pick).map((r) => [
+          r.auction_date, r.type, maturityText(r), amountText(auctions, r.offering_amt), rateText(r),
+          fmtNum(r.bid_to_cover), fmtNum(r.coupon, 3), r.tag || '',
+        ]), '해당하는 입찰 결과가 없습니다.');
+        noteBox.textContent = ['출처 ' + auctions.source, auctions.note].filter(Boolean).join(' · ');
+      } else {
+        table(tableBox, [
+          { name: '입찰일', always: true }, { name: '발행일' }, { name: '종류' }, { name: '만기' },
+          { name: '발행액 (' + (auctions.amount_label || '억') + ')', num: true },
+          { name: '표면금리 (%)', num: true }, { name: '구분' },
+        ], auctions.pending.filter(pick).map((r) => [
+          r.auction_date, r.issue_date || '–', r.type, maturityText(r), amountText(auctions, r.offering_amt),
+          fmtNum(r.coupon, 3), r.tag || '',
+        ]), '해당하는 입찰이 없습니다.');
+        noteBox.textContent = '공고됐지만 결과가 아직 올라오지 않은 입찰입니다. 발행액은 공고된 뒤에 채워집니다.';
+      }
+    };
+
+    const head = '기준일 ' + c.last[0] + ' (현지) · ' + (d.curve.title || '') + (auctions ? '' : d.auctions_note ? ' · ' + d.auctions_note : '');
+    view.append(tiles, rangeBar(head, drawCharts),
+      h('div', { class: 'grid2' }, curveCard.box, trendCard.box), bottom);
+    drawCharts();
+    drawBottom();
+    redrawCharts = drawCharts;
+  }
+
+  // ---------- 종합 탭 ----------
+  function renderAll(view) {
+    const list = loaded.map((a) => ({ area: a, c: curveOf(a.data) }));
+
+    const tiles = h('section', { class: 'tiles', 'aria-label': '나라별 10년물 금리' });
+    for (const { area, c } of list) {
+      if (!c.has('10Y')) continue;
+      const v = c.last[c.col('10Y')];
+      tiles.append(h('div', { class: 'tile' },
+        h('div', { class: 'label', text: area.name + ' 10년' }),
+        h('div', { class: 'value', text: v.toFixed(2) + '%' }),
+        h('div', { class: 'delta', text: moved(bp(v, c.prev && c.prev[c.col('10Y')])) })));
+    }
+
+    const trendCard = card('10년물 금리 추이', true);
+    const drawCharts = () => {
+      const days = [...new Set(list.flatMap(({ c }) => c.rows.map((r) => r[0])))].sort().slice(-RANGES[state.range][1]);
+      const series = list.filter(({ c }) => c.has('10Y')).map(({ area, c }) => {
+        const byDay = new Map(c.rows.map((r) => [r[0], r[c.col('10Y')]]));
+        return { name: area.name, color: area.color, values: days.map((day) => byDay.has(day) ? byDay.get(day) : null) };
+      });
+      legend(trendCard.legendBox, series);
+      lineChart(trendCard.body, {
+        labels: days, series: series, endLabels: true, connectGaps: true,
+        aria: '나라별 10년물 국채 금리 추이. 좌우 화살표로 날짜별 값을 읽을 수 있습니다.',
+        ticks: (plotW) => evenTicks(days.length, plotW >= 420 ? 5 : 4),
+        tickLabel: dateTick(days),
+      });
+    };
+
+    const levels = h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('h2', { text: '나라별 주요 만기 금리' }),
+      h('p', { class: 'note', text: '괄호는 전일 대비 bp' })));
+    const levelBox = h('div', { class: 'scroll' });
+    levels.append(levelBox);
+    const cell = (c, t) => {
+      if (!c.has(t)) return '–';
+      const v = c.last[c.col(t)];
+      return [v.toFixed(2), '(' + fmtBp(bp(v, c.prev && c.prev[c.col(t)])) + ')'];
+    };
+    table(levelBox, [
+      { name: '나라', always: true }, { name: '기준일', always: true },
+      { name: '2년', num: true }, { name: '5년', num: true }, { name: '10년', num: true },
+      { name: '20년', num: true }, { name: '30년', num: true },
+    ], list.map(({ area, c }) => [area.name, c.last[0], cell(c, '2Y'), cell(c, '5Y'), cell(c, '10Y'), cell(c, '20Y'), cell(c, '30Y')]), '');
+
+    // 아래 표: 여러 나라 입찰을 한데 모아 본다 (이표채만)
+    const bottom = h('section', { class: 'card wide' });
+    const controls = h('div', { class: 'card-head' });
+    const tableBox = h('div', { class: 'scroll' });
+    const noteBox = h('p', { class: 'note', text: '이표채만 모았습니다. 낙찰금리 기준은 나라마다 다르니 각 나라 탭의 설명을 보십시오.' });
+    bottom.append(controls, tableBox, noteBox);
+    const gather = (key) => list.flatMap(({ area }) => {
+      const a = area.data.auctions;
+      return a ? (a[key] || []).filter((r) => !r.bill).map((r) => ({ r, a, area })) : [];
+    });
+    const results = gather('results').sort((p, q) => q.r.auction_date.localeCompare(p.r.auction_date)).slice(0, 60);
+    const pending = gather('pending').sort((p, q) => p.r.auction_date.localeCompare(q.r.auction_date)).slice(0, 60);
+    const views = ['최근 입찰 결과', '입찰 예정 ' + pending.length + '건'];
+    if (state.bottom >= views.length) state.bottom = 0;
+    const unit = (a) => String(a.amount_label || '').replace(/^[억조]\s*/, '');
+    const withUnit = (a, v) => v == null ? '–' : amountText(a, v) + (a.amount_label || '').charAt(0) + ' ' + unit(a);
+    const drawBottom = () => {
+      controls.textContent = '';
+      controls.append(segmented(views, state.bottom, (i) => { state.bottom = i; drawBottom(); }, '표 종류'));
+      if (state.bottom === 0) {
+        table(tableBox, [
+          { name: '입찰일', always: true }, { name: '나라', always: true }, { name: '종류' }, { name: '만기' },
+          { name: '발행액', num: true }, { name: '낙찰금리 (%)', num: true }, { name: '응찰률 (배)', num: true }, { name: '표면금리 (%)', num: true },
+        ], results.map(({ r, a, area }) => [
+          r.auction_date, area.name, r.type, maturityText(r), withUnit(a, r.offering_amt), rateText(r),
+          fmtNum(r.bid_to_cover), fmtNum(r.coupon, 3),
+        ]), '입찰 결과가 없습니다.');
+      } else {
+        table(tableBox, [
+          { name: '입찰일', always: true }, { name: '나라', always: true }, { name: '종류' }, { name: '만기' },
+          { name: '발행액', num: true }, { name: '구분' },
+        ], pending.map(({ r, a, area }) => [
+          r.auction_date, area.name, r.type, maturityText(r), withUnit(a, r.offering_amt), r.tag || '',
+        ]), '예정된 입찰이 없습니다.');
+      }
+    };
+
+    view.append(tiles, rangeBar('나라마다 자료가 올라오는 시점이 달라 기준일이 다릅니다.', drawCharts),
+      h('div', { class: 'grid2' }, trendCard.box, levels), bottom);
+    drawCharts();
+    drawBottom();
+    redrawCharts = drawCharts;
+  }
+
+  // ---------- 탭 ----------
+  const tabs = [{ code: 'all', name: '종합' }].concat(AREAS);
+  function selectTab(code, focus) {
+    if (!tabs.some((t) => t.code === code)) code = 'all';
+    state.tab = code;
+    state.bottom = 0;
+    for (const b of $('tabs').children) {
+      const on = b.dataset.code === code;
+      b.setAttribute('aria-selected', String(on));
+      b.tabIndex = on ? 0 : -1;
+      if (on && focus) b.focus();
+    }
+    try { history.replaceState(null, '', '#' + code); } catch (err) { /* 주소를 못 바꿔도 화면은 그대로 쓴다 */ }
+    const view = $('view');
+    view.textContent = '';
+    redrawCharts = () => {};
+    if (!loaded.length) {
+      view.append(h('p', { class: 'card wide', text: '아직 수집된 자료가 없습니다. 첫 수집이 끝나면 표시됩니다.' }));
+    } else if (code === 'all') {
+      renderAll(view);
+    } else {
+      const area = AREAS.find((a) => a.code === code);
+      if (area.data) renderArea(area, view);
+      else view.append(h('p', { class: 'card wide', text: area.name + ' 자료를 아직 받지 못했습니다.' }));
+    }
+  }
+  tabs.forEach((t, i) => {
+    const b = h('button', { type: 'button', role: 'tab', text: t.name, 'data-code': t.code });
+    b.addEventListener('click', () => selectTab(t.code));
+    b.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      ev.preventDefault();
+      selectTab(tabs[(i + (ev.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length].code, true);
+    });
+    $('tabs').append(b);
+  });
+
+  // ---------- 머리말·꼬리말 ----------
+  const newest = loaded.map((a) => a.data.generated_at).sort().pop();
+  $('asof').textContent = newest ? '수집 ' + kst(newest) : '';
+  $('sources').textContent = '출처: ' + loaded.map((a) => a.data.sources).filter(Boolean).join(', ') + '. 모두 공개 자료입니다.';
+  const warnings = loaded.flatMap((a) => (a.data.errors || []).map((e) => a.name + ' — ' + e));
+  if (warnings.length) {
     $('warn').hidden = false;
-    $('warn').querySelector('summary').textContent = '수집 경고 ' + data.errors.length + '건';
-    for (const line of data.errors) $('warn-list').append(h('li', { text: line }));
+    $('warn').querySelector('summary').textContent = '수집 경고 ' + warnings.length + '건';
+    for (const line of warnings) $('warn-list').append(h('li', { text: line }));
   }
 
-  drawCurve();
-  drawTrend();
-  drawAuctions();
-  // 차트 영역 너비가 바뀌면 그 너비에 맞춰 다시 그린다
-  let drawnWidth = $('curve-chart').clientWidth;
+  selectTab((location.hash || '#all').slice(1));
+  window.addEventListener('hashchange', () => {
+    const code = (location.hash || '#all').slice(1);
+    if (code !== state.tab) selectTab(code);
+  });
+  // 화면 너비가 바뀌면 그 너비에 맞춰 차트를 다시 그린다
+  let drawnWidth = $('view').clientWidth;
   new ResizeObserver(() => {
-    const w = $('curve-chart').clientWidth;
+    const w = $('view').clientWidth;
     if (w === drawnWidth) return;
     drawnWidth = w;
-    drawCurve();
-    drawTrend();
-  }).observe($('curve-chart'));
+    redrawCharts();
+  }).observe($('view'));
 })();
 </script>
 </body>

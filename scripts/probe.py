@@ -11,8 +11,10 @@ import sys
 
 import common
 
-LIMIT = 100          # 값 하나를 찍는 최대 길이
-TEXT_HEAD = 1500     # JSON이 아닐 때 앞부분만 찍는다
+LIMIT = 110          # 값 하나를 찍는 최대 길이
+TEXT_HEAD = 2600     # JSON이 아닐 때 앞부분
+TEXT_TAIL = 900      # JSON이 아닐 때 끝부분
+MAX_KEYS = 45
 
 
 def short(value) -> str:
@@ -20,12 +22,25 @@ def short(value) -> str:
     return text if len(text) <= LIMIT else text[:LIMIT] + "…"
 
 
-def show_record(rec) -> None:
-    if not isinstance(rec, dict):
-        print("   ", short(rec))
-        return
-    for key in rec:
-        print(f"    {key} = {short(rec[key])}")
+def show(value, indent: str = "    ", depth: int = 0) -> None:
+    if isinstance(value, dict) and depth < 2:
+        for i, key in enumerate(value):
+            if i >= MAX_KEYS:
+                print(f"{indent}… 외 {len(value) - MAX_KEYS}개")
+                break
+            item = value[key]
+            if isinstance(item, (dict, list)) and item and depth < 1:
+                print(f"{indent}{key}:")
+                show(item, indent + "    ", depth + 1)
+            else:
+                print(f"{indent}{key} = {short(item)}")
+    elif isinstance(value, list):
+        print(f"{indent}목록 {len(value)}건")
+        if value:
+            print(f"{indent}첫 항목: {short(value[0])}")
+            print(f"{indent}끝 항목: {short(value[-1])}")
+    else:
+        print(f"{indent}{short(value)}")
 
 
 def probe(url: str) -> None:
@@ -37,25 +52,31 @@ def probe(url: str) -> None:
         print("  실패:", exc)
         return
     print(f"  {len(body)}바이트")
+    if body[:4] == b"PK\x03\x04":
+        try:
+            for number, rows in enumerate(common.xlsx_sheets(body), 1):
+                print(f"  XLSX 시트 {number}: {len(rows)}행")
+                for row in rows[:14] + rows[-4:]:
+                    print("    | " + " | ".join(short(cell)[:28] for cell in row[:16]))
+        except Exception as exc:
+            print("  XLSX 읽기 실패:", exc)
+        return
     try:
         data = json.loads(body)
     except ValueError:
-        print(body[:TEXT_HEAD].decode("utf-8", errors="replace"))
+        text = body.decode("utf-8", errors="replace")
+        print(text[:TEXT_HEAD])
+        if len(text) > TEXT_HEAD + TEXT_TAIL:
+            print("  …(중략)…")
+            print(text[-TEXT_TAIL:])
         return
     if isinstance(data, list):
         print(f"  JSON 목록 {len(data)}건. 첫 항목:")
         if data:
-            show_record(data[0])
-    elif isinstance(data, dict):
-        print(f"  JSON 객체. 최상위 항목: {', '.join(data)}")
-        for key, value in data.items():
-            if isinstance(value, list) and value:
-                print(f"  [{key}] {len(value)}건. 첫 항목:")
-                show_record(value[0])
-            elif not isinstance(value, list):
-                print(f"  [{key}] {short(value)}")
+            show(data[0])
     else:
-        print("  ", short(data))
+        print("  JSON 객체:")
+        show(data)
 
 
 def main() -> int:
