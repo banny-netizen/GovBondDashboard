@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import json
 import time
+from html.parser import HTMLParser
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -121,7 +122,8 @@ def xlsx_sheets(data: bytes, max_bytes: int = 30_000_000) -> list[list[list[str]
                     shared.append("".join(node.text or "" for node in item.iter()
                                           if local_name(node.tag) == "t"))
         sheet_names = sorted(
-            (n for n in names if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")),
+            (n for n in names
+             if n.lower().startswith("xl/worksheets/sheet") and n.lower().endswith(".xml")),
             key=lambda n: int("".join(ch for ch in n.rsplit("/", 1)[-1] if ch.isdigit()) or 0),
         )
         for name in sheet_names:
@@ -147,3 +149,61 @@ def xlsx_sheets(data: bytes, max_bytes: int = 30_000_000) -> list[list[list[str]
                     rows.append([cells.get(i, "") for i in range(max(cells) + 1)])
             sheets.append(rows)
     return sheets
+
+
+class _TableParser(HTMLParser):
+    """HTML 표를 [표][행][(글자, 첫 링크)] 로 뽑는다."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.tables: list[list[list[tuple[str, str | None]]]] = []
+        self._open: list[list] = []
+        self._row: list | None = None
+        self._cell: dict | None = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "table":
+            self._open.append([])
+        elif tag == "tr" and self._open:
+            self._row = []
+        elif tag in ("td", "th") and self._row is not None:
+            self._cell = {"text": [], "href": None}
+        elif tag == "a" and self._cell is not None:
+            href = dict(attrs).get("href")
+            if href and not self._cell["href"]:
+                self._cell["href"] = href
+        elif tag == "br" and self._cell is not None:
+            self._cell["text"].append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in ("td", "th") and self._cell is not None and self._row is not None:
+            text = " ".join("".join(self._cell["text"]).split())
+            self._row.append((text, self._cell["href"]))
+            self._cell = None
+        elif tag == "tr" and self._row is not None:
+            if self._open and self._row:
+                self._open[-1].append(self._row)
+            self._row = None
+        elif tag == "table" and self._open:
+            self.tables.append(self._open.pop())
+
+    def handle_data(self, data):
+        if self._cell is not None:
+            self._cell["text"].append(data)
+
+
+def html_tables(html: str) -> list[list[list[tuple[str, str | None]]]]:
+    parser = _TableParser()
+    parser.feed(html)
+    parser.close()
+    return parser.tables
+
+
+def decode_text(body: bytes) -> str:
+    """UTF-8 을 먼저 시도하고, 안 되면 일본어 사이트용 인코딩으로 읽는다."""
+    for encoding in ("utf-8-sig", "cp932"):
+        try:
+            return body.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return body.decode("utf-8", errors="replace")
